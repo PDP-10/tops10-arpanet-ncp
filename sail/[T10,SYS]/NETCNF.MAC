@@ -1,0 +1,103 @@
+SUBTTL	NETCNF - NETWORK CONFIGURATION DEFINITION FILE OUTPUT BY MONGEN DIALOG
+
+
+DEFINE XP(A,B),<A==:B>
+
+
+XP M.NET,52
+XP M.RSS,0
+XP M.DS10,0
+XP M.DP01,0
+
+;;	Network software(Y,N)[
+;;	Software to support remote computers: DECsystem-10's,
+;;	PDP-11's, PDP-8's (requires FTNET to be -1)]: Y	; network software, please
+XP M.NET,1
+
+;;	Cpu's(1,1-4)[Total number of cpu's in the system]: 2	; two cpus
+
+;;	How many DC75NP's or DN87's on CPU0(1,0-8)[Network
+;;	front-ends connected to DL10's.]: 2	; two dn87s
+XP M.DC75,2
+
+;;	To which DL10 port is the DC75 or DN87 connected (0,0-7)[]: 0	; first one is one port 0
+
+;;	To which DL10 port is the DC75 or DN87 connected (0,0-7)[]: 2	; second one is one port 2 (It's a long story why it's not 1)
+XP M00D85,1
+XP M01D85,0
+XP M02D85,1
+XP M03D85,0
+XP M04D85,0
+XP M05D85,0
+XP M06D85,0
+XP M07D85,0
+
+;;	How many DN87S's on CPU0(1,0-3)[Network
+;;	front-ends connected to DTE-20's]: 0	; but no DN87Ss on cpu0
+XP M.D87S,0
+XP M0D87S,0
+XP M00D8S,0
+XP M01D8S,0
+XP M02D8S,0
+XP M03D8S,0
+XP M10D85,0
+XP M11D85,0
+XP M12D85,0
+XP M13D85,0
+XP M14D85,0
+XP M15D85,0
+XP M16D85,0
+XP M17D85,0
+
+;;	How many DN87S's on CPU1(1,0-3)[Network
+;;	front-ends connected to DTE-20's]: 0	; nor on cpu1
+XP M.D87S,0
+XP M1D87S,0
+XP M10D8S,0
+XP M11D8S,0
+XP M12D8S,0
+XP M13D8S,0
+
+;;	Node number of central site(1,1-77)[
+;;	Unique octal number identifying system to network.]: 1	; central site has to remain what users are used to (eg, MTA01x:)
+XP OURNNM,1
+
+;;	Name of central site[Six characters or less.]: Mordor
+
+DEFINE	SYSNDE
+	<SIXBIT	&Mordor&>
+
+;;	# of remote TTY's(1,1-512)[
+;;	Maximum number of teletypes on network nodes to be
+;;	handled at any given time.]: 128	; pick a random number of remote ttys
+XP M.RMCR,200
+
+;;	Network virtual terminals(Y,N)[
+;;	Code to allow local terminals to "SET HOST" to other systems.]: y	; network virtual terminals (for DECNET, that is)
+XP M.RVTM,1
+
+;;	Remote card readers(Y,N)[
+;;	Code to allow access to card readers on remote stations.]: y	; support remote cdrs
+XP M.RCDR,1
+
+;;	Remote line printers(Y,N)[
+;;	Code to allow access to line printers on remote stations.]: y	; support remote lpts
+XP M.RLPT,1
+XP M.RPTP,0
+XP M.RPTR,0
+XP M.RPLT,0
+
+;;	Remote data entry terminals(Y,N)[
+;;	Code to allow access to remote data entry terminals (RDX devices).]: n	; no remote data entry terminals
+XP M.RDX,0
+
+;;	Remote task-to-task(Y,N)[
+;;	Code to allow access to remote jobs (TSKSER).]: n	; task to task
+XP M.RJOB,0
+
+;;	# of connects(256,1-512)[
+;;	Maximum number of simultaneous connections.]: 140	; another random number for maximum number of connects
+XP M.CONN,214
+;;	
+;;	END OF NETCNF.MAC
+

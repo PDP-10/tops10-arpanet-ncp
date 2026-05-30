@@ -1,0 +1,141 @@
+SUBTTL	TTYCNF - TERMINAL CONFIGURATION DEFINITION FILE OUTPUT BY MONGEN
+
+
+DEFINE XP(A,B),<A==:B>
+
+
+XP M.TTY,52
+
+;;	DECsystem10(1070,1080,1090,1091,2020)[
+;;	1070 is a system with KI10 cpu's
+;;	1080 is a system with KL10 cpu's
+;;	1090 is a system with KL10 cpu's and internal channels
+;;	1091 is a system with a KL10 cpu, internal memory, and devices
+;;	 on the front end
+;;	2020 is a system with a KS10 cpu]: 1070
+
+;;	Cpu's(1,1-4)[Total number of cpu's in the system]: 2	; dual cpu system
+
+;;	How many DC10s on CPU0(1,0-2)[
+;;	The DC10 is a data line scanner]: 0	;DC10S on cpu0
+
+;;	How many DC68s on CPU0(1,0-2)[
+;;	The DC68 is a PDP-8 680 or 680I communications system]: 0	;DC68S on cpu0
+
+;;	How many DC76s on CPU0(1,0-8)[
+;;	The DC76 is a PDP-11 communications system]: 0	;dc76s on cpu0
+XP M.DC10,0
+XP M.DC68,0
+XP M.DC76,0
+XP MD.DCS,0
+XP M.D70N,0
+XP M.D71N,0
+XP M.D72N,0
+XP M.D73N,0
+XP M.D74N,0
+XP M.D75N,0
+XP M.D76N,0
+XP M.D77N,0
+XP M.D78N,0
+XP M.D79N,0
+XP M.D7AN,0
+XP M.D7BN,0
+XP M.TTG0,0
+XP M.TTG1,0
+XP M.DSG0,0
+XP M.DSG1,0
+XP M.68L0,0
+XP M.68L1,0
+XP M.DZNL,0
+XP M0DZNL,0
+XP M.TLTL,0 ;TOTAL LOCAL TTY LINES
+
+
+;;	How many DC10s on CPU1(1,0-2)[
+;;	The DC10 is a data line scanner]: 0	;DC10S on cpu1
+
+;;	How many DC68s on CPU1(1,0-2)[
+;;	The DC68 is a PDP-8 680 or 680I communications system]: 0	;DC68S on cpu1
+
+;;	How many DC76s on CPU1(1,0-8)[
+;;	The DC76 is a PDP-11 communications system]: 0	;dc76s on cpu1
+
+;;	OPR octal line #(CTY,0-1)[OPR is privileged operator terminal]: CTY
+DEFINE	OPRLIN<
+
+	OPRL	CTY
+>
+
+;;	Answer the following questions about your TTY lines(M-N).
+;;	[Type one octal line #(M) or one range(M-N) or CTY on separate
+;;	lines.  Type extra carriage return when through.]
+DEFINE	MACDSD<
+
+;;	Data set lines[Class of terminal for LOGIN, LOGIN resets line
+;;	to computer echoing and no hardware tabs]
+;;	 ;DATA SETS (All on SHELOB and GOLLUM now)
+>
+DEFINE	MACTAB<
+
+;;	Lines with hardware tabs[Monitor simulates rest with spaces]
+;;	0-11 ;HDW TABS (on ARPAnet lines, same as ITYN in HDWCNF)
+L 0,11 
+;;	;No more HDW TABS
+>
+DEFINE	MACRMT<
+
+;;	Remote lines[Class of terminal for LOGIN, do not confuse
+;;	with remote station TTYs]
+;;	0-211	;REMOTE LINES (everyone remote until they get initia run)
+L 0,211	
+;;	 ; no more remote lines........
+>
+DEFINE	MACLCP<
+
+;;	Local copy lines[Echoing provided by terminal rather than
+;;	by computer.  Often (incorrectly) called half duplex]
+;;	0-11	;LOCAL COPY LINES (on arpanet lines, same as ITYN in HDWCNF)
+L 0,11	
+;;	 ;No more local copy lines
+>
+DEFINE	MACHLF<
+
+;;	Half duplex lines[TWX or half duplex wired scanner(DC10C)]
+;;	 ;HALF DUPLEX
+>
+DEFINE	MACSLV<
+
+;;	Slaves[No commands may be typed]
+;;	 ;SLAVES
+>
+DEFINE	MACFRM<
+
+;;	Lines with hardware form feed[Leave out if users
+;;	would rather not get form feeds until they do TTY FORM commands]
+;;	0-11 ;HDW FORM FEED ITYS (on ARPAnet lines, same as ITYN in HDWCNF)
+L 0,11 
+;;	;No more HDW FORM FEEDS
+>
+DEFINE	MACINI<
+
+;;	Lines which run INITIA at startup
+;;	CTY;LINES WHICH RUN INITIA AT STARTUP
+L CTY
+;;	0-212	;Everybody
+L 0,212	
+;;	214	;INCLUDING CTY1
+L 214	
+;;	 ;No more INITIAs
+>
+DEFINE	MACFLC<
+
+;;	Filler class codes(M-N,P)[
+;;	Type M,P for one line M with filler class code P or
+;;	M-N,P for a range of lines with filler class code P]
+;;	0-214,0 ;FILL CLASS (ARPANET lines have fill 0, same as ITYN in HDWCNF)
+L 0,214,0 
+;;	 ;No more filler
+>
+DEFINE MACDIS<>
+;;	END OF TTYCNF.MAC
+

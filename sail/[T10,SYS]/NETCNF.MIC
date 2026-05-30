@@ -1,0 +1,23 @@
+!** command file to create netcnf.mac for dn87 system **
+
+.run mongen
+*prompt
+*net
+*mon:netcnf.mac
+*Y	; network software, please
+*2	; two cpus
+*2	; two dn87s
+*0	; first one is one port 0
+*2	; second one is one port 2 (It''s a long story why it''s not 1)
+*0	; but no DN87Ss on cpu0
+*0	; nor on cpu1
+*1	; central site has to remain what users are used to (eg, MTA01x:)
+*Mordor
+*128	; pick a random number of remote ttys
+*y	; network virtual terminals (for DECNET, that is)
+*y	; support remote cdrs
+*y	; support remote lpts
+*n	; no remote data entry terminals
+*n	; task to task
+*140	; another random number for maximum number of connects
+.mic return

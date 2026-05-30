@@ -1,0 +1,114 @@
+.ERROR
+
+.RUN MONGEN
+*PROMPT
+*HDW
+*mon:HdwCnf.mac	; file name
+*1070		;KI system
+*2		;number of processors
+*Afwal/Avsail 701.'A
+*AVSAIL
+*1		;ARPA HOST NUMBER ON IMP
+*47		;ARPA IMP NUMBER
+*656		;CPU0 SERIAL NUMBER
+*1		;DK10'S ON CPU0
+*730		; cpu1 serial number
+*1		; dk10's on cpu1
+*Y		;EXCLUDE MONITOR OVERHEAD
+*Y		;HIGH PRECISION TIME ACCOUNTING
+*Y		; account varification code
+*3		;# OF DATA CHANNELS on CPU0
+*DF10C		;CHANNEL 0 TYPE
+*0		;RC10 CONTROLLERS
+*0		;RH10 FOR RS04'S ON 0
+*1		;RH10'S FOR RP04'S
+*8		;UNITS ON RPA
+*0		;RP10'S ON CHANNEL 0
+*0		;TM10B'S ON 0
+*0		;RH10'S FOR TM02'S ON CHN 0
+*DF10C		;CHANNEL 1 TYPE
+*0		;RC10'S ON CHANNEL 1
+*0		;RH10'S FOR RS04'S ON CHANNEL 1
+*1		;RH10'S FOR RP04'S ON CHANNEL 1
+*8		;UNITS ON RPB
+*0		;RP10'S ON CHANNEL 1
+*0		;TM10B'S ON CHANNEL 1
+*0		;RH10'S FOR TMO2'S ON CHANNEL 1
+*DF10C		;CHANNEL 2 TYPE
+*0		;RC10'S ON CHANNEL 2
+*0		;RH10'S FOR RS04'S ON CHANNEL 2
+*0		;RH10'S FOR RP04'S ON CHANNEL 2
+*0		;RP10'S ON CHANNNEL 2
+*1		;TM10B'S ON CHANNEL 2
+*6		;UNITS ON MTA
+*0		;RH10'S FOR TM02'S ON CHANNEL 2
+*0		;TM10A'S ON SYSTEM
+*0		; number of channels on cpu1 (oh, for a kl!)
+*3		;WHICH DRIVE IS 7-TRACK
+*		;NO MORE 7-TRACK DRIVES
+*		;NO 6250 BPI DRIVES
+*65		;# JOBS
+*0		;MAX PAGES OF CORE 
+*768		;# K SYSTEM CORE
+*60		;POWER LINE FREQUENCY
+*4		;# REAL-TIME DEVICES
+*150		;CORMIN
+*3		;HPQ'S
+*Y		;METER UUO
+*N		;SYSCHK NOT PERFORMED
+*Y		;MSGSER ON
+*Y		;PSISER ON
+*Y		;IPCF ON
+*Y		;ENQ/DEQ ON
+*Y		; monitor resident boots
+*1		;# CDR'S on cpu0
+*N		;NO CDP on cpu0
+*N		;NO DIS TYPE DEVICES on cpu0
+*0		;TD10'S on cpu0
+*2		;# LPT'S on cpu0
+*N		;NO LOWER CASE ON LPT0:
+*Y		;LOWER CASE ON LPT1:
+*1		;#PLOTTERS on cpu0
+*Y		;YES TO PTP on cpu0
+*Y		;YES TO PTR: on cpu0
+*0		; number of da28's on cpu0
+*0		; number of dn60's
+*0		;# CDR'S on cpu1
+*N		;NO CDP on cpu1
+*N		;NO DIS TYPE DEVICES on cpu1
+*0		;TD10'S on cpu1
+*0		;# LPT'S on cpu1
+*0		;#PLOTTERS on cpu1
+*Y		;YES TO PTP on cpu1
+*Y		;YES TO PTR: on cpu1
+*0		; number of da28's on cpu1
+*40		;# OF PTY'S
+*20		;# of imp's
+*10		;# of ity's
+*PAVJSP,60	;DECIMAL SYMBOLS AVG JOB SIZE FOR SCHEDULER
+*m.enqd,100	; default quota for enq., deq.
+*
+*A00CLH,'A	;OCTAL SYMBOL
+*M.XFFA,1	;[OPR] BYPASSES FILE DAEMON
+*LIMLVL,5	;SFD LEVEL
+*		;NO MORE OCTAL SYMBOLS
+*		;SIXBIT SYMBOLS
+*		;PI-CHANNEL FOR NON-STANDARD DEVICES
+*		;PI-CHANNEL FOR SPECIAL DEVICES WITH DDB'S
+*		;HIGHEST AC TO SAVE FOR SPECIAL PI-CHANNEL DEVICES
+*don,10,377,all		; ersatz devices: mine
+*jim,10,406,ALL		;		  yours
+*MTR,10,46,All		; Place where current monitor stuff is parked
+*OMT,10,45,All		; Place where old monitor stuff is parked
+*CAD,6671,102,all	; for cad
+*SIM,7,4,sys		; simulation software
+*SMS,7,5,sys		; more of same
+*SAI,5,15,sys		; SAIL library files
+*MAI,3,5,sys		; arpanet mail area
+*TML,3,4,sys		; TELL mail area
+*CMO,4125,162,all	; CONFIGURATION AREA
+*DED,1,13,sys		; dead sys cusps
+*CJR,10,104,all		; Chuck
+*DAB,242,134,all	; Doug
+*		; no more ersatz devices
+.;	[END OF MONGEN]

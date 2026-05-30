@@ -1,0 +1,2 @@
+pswchg==1			; let users change their passwords
+batmax==1			; support batch

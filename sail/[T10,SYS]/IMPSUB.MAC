@@ -1,0 +1,1826 @@
+; The following multi-page comment is the IMPSUB client specification.
+; C.F.Everhart, 27 May 1980
+
+comment	&
+
+IMPSUB is a library of routines designed to do Arpanet host-table
+management.  The source for the host table information is kept as two
+files on SYS:, one an NIC-maintained host listing, the other a file of
+CMU additions and corrections.  IMPSUB maintains a copy of the
+interesting information in this file in the high segment of the
+program's core image, updating this copy as necessary, and also
+provides several entry points by which the table may be examined.  The
+client programs need never look at the internal representation of the
+host table; instead, all accesses are done through the provided entry
+points.
+
+IMPSUB uses Ed Taft's TULIP package to do I/O.  TULIP does I/O through
+a local-UUO mechanism which is incompatible with the one that the SAIL
+language runtime system uses; interfacing this package to SAIL routines
+may be difficult.  IMPSUB uses channel 0 (typically the last channel
+number allocated by channel-management packages) for I/O.  It also
+assumes that the cells .JBFF and .JBREL contain meaningful information,
+another assumption that is false in the SAIL runtime environment.
+
+The entry points provided by IMPSUB are described below.  Detailed
+specifications follow this summary.
+
+	HstNam	Looks up a name in the table, searching both nicknames
+		and full names according to a standard procedure, doing
+		unique-match disambiguation as possible.
+	HstNum	Returns all sorts of host information given a host
+		address (in the new 32-bit format).
+	HstGen	Takes a host name, which may also be absent or only
+		partially specified, and calls the procedure which it
+		is passed with information about each host that
+		matches.  For each host that matches, HSTGEN will also
+		call a second procedure with information about each
+		nickname of that host.
+	HstNGn	Like HstGen, only takes a partially-specified host number,
+		and calls procedures for all matching hosts and nicknames.
+
+The following routines are called by the above entry points, and need
+not be called by the user; however, the user may also call them.
+	HstTim	Checks whether to update the high-segment copy of the
+		host table, by seeing if other invocations of the
+		program have noticed that a new copy is necessary, or
+		if too long has passed since the file timestamps were
+		last checked.
+	HstVld	Checks whether to update the high-segment copy of the
+		host table, not checking the time, but only looking to
+		see if any other invocation has noticed that the copy
+		is out of date.
+	HstChk	Unconditionally checks the timestamps on the host
+		files, updating the high-segment copy if necessary.
+
+The following routines are provided directly from the old IMPSUB
+package.
+	ICPGet	Performs an ICP rendezvous, to precede a Telnet
+		connection.
+	IMPCall	Performs an IMPUUO operation, calling IMPErr in case it
+		fails.
+	IMPErr	Deciphers and prints an IMPUUO error message.
+Detailed Specifications:
+
+First, let us define what a Host Status Word means.  It is a 36-bit
+integer, where some bits and fields in that integer mean that the host
+has certain attributes.  (It has nothing to do with whether a host is
+currently "up" as far as the Arpanet is concerned.)
+Fields in the word:
+	ht$Sts	#3	bits [34:35]
+		values:
+		St$Nul	0	means no status value given
+		St$Srv	1	Host is a SERVER--(some) services available
+		St$Usr	2	Host is a USER--outward use only
+		St$Tip	3	Host is a TIP--outward TelNet connections only
+	ht$Mlt	#4	bit  [33]
+		A 1 means that the host requires Multics-like FTP mail
+		hacks, where the mailer must do a USER NETML and PASS NETML.
+	ht$Mai	#10	bit  [32]
+		A 1 means that the host cannot handle CMU FTP's MLFL
+		protocol; the FTP MAIL protocol must be used instead.
+	ht$Fng	#20	bit  [31]
+		A 1 means that the host has a Finger server (distinct
+		from Tenex's RSExec).
+
+All numbers are octal throughout the rest of the document.  All routines
+expect in register 17 a stack pointer with at least a few dozen free
+words on the stack.  All routines will trash registers 1 through 4, and
+will preserve all the rest.  Any routine may feel free to use .JbFF as a
+point from which to allocate new core in the low segment, but such
+allocated core will be returned.  Likewise, any routine may decide to
+use channel zero, but in that case channel zero will be RELEASed.  These
+routines will indicate various degrees of success or failure by
+skipping zero or more instructions on return to the caller.  This is
+indicated below, but it helps to know the convention.  Skipping further
+generally means that the routine succeeded better.
+
+HstNam call:
+	movei	1,addressOfAscizString
+	pushj	17,HstNam
+	  jrst	NoHostTable	; Host table unreadable
+	  jrst	HostNotThere	; Register 1 is negative if the given name
+				;  is unknown, positive (gtr 0) if the given
+				;  name is ambiguous
+	<cpopj2 return>	; Host is found in table.  Registers loaded:
+	1/	pointer to ASCIZ of full, official host name
+	2/	host address, in 32-bit format
+	3/	host Status Word, in above format
+
+HstNum call:
+	move	1,hostAddress
+	pushj	17,HstNum
+	  jrst	NoHostTable	; Host table unreadable
+	  jrst	HostNotThere	; Given address not in table
+	<cpopj2 return>	; Host is found in table.  Registers loaded:
+	1/	pointer to ASCIZ of full, official host name
+	2/	host address, in 32-bit format
+	3/	host Status Word, in above format
+
+HstGen call:	(Host Generator)
+	movei	1,addressOfAscizString	; string may be any length
+	movei	2,routineToCallWithHostInfo
+	movei	3,routineToCallWithEachNickname
+	pushj	17,HstGen
+	  jrst	NoHostTable	; Host table unreadable
+	  jrst	HostNotThere	; No host for whose name the given string was
+				;  an abbreviation was found in the table.
+	<cpopj2 return>	; At least one host was found, and the given
+			;  routines were called as appropriate.
+HstNGn call:  (alternate format generator, number-based)
+	move	1,partialHostNumber
+	movei	2,routineToCallWithHostInfo
+	movei	3,routineToCallWithEachNickname
+	move	4,hostNumberMask ; 1 where partialHostNumber is to be matched,
+				 ;   0 where bit to be matched doesn't matter.
+	pushj	17,HstGen
+	  jrst	NoHostTable	; Host table unreadable
+	  jrst	HostNotThere	; No host for whose name the given string was
+				;  an abbreviation was found in the table.
+	<cpopj2 return>	; At least one host was found, and the given
+			;  routines were called as appropriate.
+RoutineToCallWithHostInfo will be called once for each separate host whose
+name or nickname matches the given name.  The registers will be set up as
+follows:
+	1/	pointer to ASCIZ of full, official host name
+	2/	host address, in 32-bit format
+	3/	host Status Word, in above format
+	4/	copy of register 1
+RoutineToCallWithEachNickname will be called after calls to RoutineToCall-
+WithHostInfo to give all the nicknames for the matching host.  If you don't
+want to see the nicknames, pass HstGen the address of a null routine.
+If RoutineToCallWithEachNickname is zero, no nickname routine will be called.
+The registers will be set up as follows:
+	1/	pointer to ASCIZ of one nickname for this host
+	2/	host address, in 32-bit format (same as before)
+	3/	host Status Word, in above format (same as before)
+	4/	pointer to ASCIZ of full, official host name (not nickname)
+
+When these two routines are called, the contents of the other registers
+are unspecified; they may well not contain what was in them when HstGen
+was called.  The routines may destroy any of registers 1, 2, 3, and 4,
+but must not affect any of the rest.
+
+If HstGen is called with the full name of one host as its argument, it
+will return the information for that host, including all its nicknames.
+If HstGen is called with no name (e.g.  "movei 1,[0]"), then it will
+return the information for all hosts in the table.
+Details of the other routines:
+
+; HstTim: Routine to look at the time of day and decide whether it's time
+;   yet to LOOKUP the host tables to see if they've changed.
+; Call:
+;	pushj	p,HstTim
+;	  +1 return: can't access host tables
+;	  +2 return: all's well with the host table, after a rebuild.
+;	  +3 return: all was well with the table, no action necessary.
+
+
+; HstVld: Routine to check that we know the host table to be valid.  We
+;   compare the private timestamps of the two host table files with the
+;   public versions.  If either is different, we call HstChk to rebuild the
+;   data structure ourselves.
+; Call:
+;	pushj	p,HstVld
+;	  +1 return: host tables inaccessible
+;	  +2 return: host table OK, but we had to rebuild
+;	  +3 return: host table timestamps were fine, no action necessary.
+
+
+; HstChk: Routine to LOOKUP the host tables to see if we need to rebuild the
+;   in-memory copies of them.
+; Call:
+;	pushj	p,HstChk
+;	  +1 return: can't access host tables
+;	  +2 return: all's well with the host table
+
+
+; ICPGET: ROUTINE TO PERFORM AN ICP CONNECTION USING CHANNEL 0.
+;	MOVE	T1,[DESIRED FOREIGN ICP SOCKET (ODD)]
+;	MOVE	T2,[ADDRESS OF TELNET CONNECTION BLOCK]
+;	PUSHJ	P,ICPGET
+;	  ERROR--MESSAGE ALREADY PRINTED, NO CONNECTIONS OPEN
+;	NORMAL RETURN--TELNET CONNECTION OPEN
+;  THE TELNET CONNECTION BLOCK MUST HAVE THE DEVICE, LOCAL SOCKET,
+;  BYTE SIZE, AND HOST FIELDS SETUP AND THE REMAINING FIELDS ZERO.
+;  THE LOCAL SOCKET MUST BE EVEN AND .GE. 2.  THE CONNECTION
+;  BLOCK IS RETURNED WITH THE ACTUAL IMP DEVICE NAME AND REMOTE
+;  SOCKET (FOR THE RECEIVE CONNECTION) STORED IN IT.
+;  THE LH OF T2 MAY CONTAIN IMPUUO FLAGS OR A NONSTANDARD TIMEOUT
+;  TO BE USED ON BOTH THE ICP AND TELNET CONNECTIONS.
+
+; IMPCAL: ROUTINE TO PERFORM AN IMPUUO OPERATION, WITH ERROR MESSAGES
+;  PRINTED AUTOMATICALLY.
+;	MOVE	T1,[IMPUUO ARGUMENT WORD]
+;	PUSHJ	P,IMPCAL
+;	  ERROR--MESSAGE ALREADY PRINTED
+;	NORMAL RETURN
+;  NO AC'S ARE CLOBBERED ON EITHER RETURN, EXCEPT THAT IF THE RH OF
+;  T1 WAS ZERO IT IS SET TO POINT TO A DUMMY CONNECTION BLOCK.
+
+; IMPERR: ROUTINE TO PRINT AN IMP ERROR MESSAGE ONTO THE FILE POINTED TO BY
+;  EFILE.
+;	MOVE	T1,[IMPUUO ARGUMENT WORD]
+;	PUSHJ	P,IMPERR
+;	ALWAYS RETURN HERE, NO AC'S CLOBBERED
+;  THE RH OF T1 MUST POINT TO THE CONNECTION BLOCK THAT WAS USED WHEN
+;  THE IMPUUO OPERATION FAILED.
+
+&	; end of multi-page comment of IMPSUB client specification
+	Universal HstTbl -- Parameters for IMPSUB host-table modules
+	subttl	C.F.Everhart -- 16 May 1980 from E.A.Taft module
+
+	TwoSegments
+	reloc	400000
+	search	MacTen,UUOSym,Tulip
+
+; This module defines symbolic offsets for data structures referred to
+;   in the rest of the modules in this file.
+; The host table is the main structure maintained by this set of modules.
+; It is a contiguous array of PDP-10 memory cells pointed to by global cell
+;   SHRPTR.  The cells SHRHTS, SHRATS, SHRCHK, and LOWHTS are used to
+;   maintain the identicality of the in-memory version of the Arpanet host
+;   table and the version on the disk (in the two files SYS:HOSTS.TXT and
+;   SYS:HOSTS.ADD).  HOSTS.TXT is a NIC-maintained table, and HOSTS.ADD
+;   outlines CMU additions.
+; SHRCHK is the UDT (Universal Date-Time) of the last check on the creation
+;   dates of the files; they are checked no more often than every hour or so.
+; SHRHTS and SHRATS are file creation date/times for the HOSTS.TXT and
+;   HOSTS.ADD files; they reside in sharable storage.  LOWHTS and LOWATS are
+;   private (low-segment) copies of those variables; these are used to detect
+;   when the shared host table is being updated.
+; The strategy for updating the host table is relatively simple: one checks
+;   every hour or so that the file timestamps in SHRxTS are the same as those
+;   of the actual files.  When either is different, one marks the shared
+;   timestamp invalid and then rebuilds the host table.  At the same time, in
+;   ordinary use, one almost constantly checks that the shared timestamps
+;   are identical to the private ones; this is a trivial operation.  As soon
+;   as either is different, one must rebuild the host table, resetting both
+;   the sharable and the private timestamps.
+
+; The SHRPTR cell points at the first word of the in-memory host table, which
+;   will be in the high segment of the program's core image.  The host table
+;   is a sequence of host entries, whose first word, $htLen, is a count of the
+;   number of words in the entire entry (including the count word).  The
+;   sequence is terminated by a zero word.
+; The second word of each entry, $htNum, is the host number, packed in
+;   standard 32-bit format.
+; The third word of each entry, $htAtr, is a set of attributes drawn from the
+;   various properties of the hosts.
+; The fourth word of each entry, $htNLn, is the length in words of a name
+;   sub-entry, which consists of a number of words and a 7-bit ASCIZ string.
+;   The count of words includes the word that contains the count, so an entry
+;   for the string "FOO" would have a count of two, while an entry for the
+;   strings "BARPH" or "FOOBAZ" would have a count of three.
+; This name sub-entry at the fourth word of the host entry is the canonical
+;   name for the given host.  It is followed by zero or more nicknames for the
+;   host, as a sequence of further name sub-entries.  The count for name
+;   sub-entries has symbolic name $NmLen, while the first text cell has name
+;   $NmTxt.
+
+	$htLen==:0	; Offset of word containing length of entry in words
+	$htNum==:1	; Offset of word containing host number, right-justified
+	$htAtr==:2	; Offset of word containing host attributes
+		ht$Sts==:3	; Field with server/user/TIP status
+			St$Nul==:0	; unknown status
+			St$Srv==:1	; value says SERVER
+			St$Usr==:2	; value says USER
+			St$Tip==:3	; value says TIP
+		ht$Mlt==:4	; Bit says Multics host, for USER NETML hack.
+		ht$Mai==:10	; Bit says to MAIL rather than MLFL.
+		ht$Fng==:20	; Bit says host has Finger server.
+	$htNLn==:3	; Offset of name sub-entry for canonical name.
+	$htTxt==:4	; Offset of text for canonical name.
+
+	$NmLen==:0	; Offset in sub-entry for length field.
+	$NmTxt==:1	; Offset in sub-entry for text.
+
+	BufWds==:10	; Number of words for largest name; may be increased.
+prgend
+	Title	HstNum -- Find host attributes given address
+	subttl	C.F.Everhart -- 27 May 1980
+
+	entry	HstNum
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, HstTbl, Tulip
+
+; HstNum: Routine to look up an Arpanet host given its address.
+; Call:
+;	move	1,hostAddress
+;	pushj	17,HstNum
+;	  +1 return: host table unreadable
+;	  +2 return: given address not in table
+;	  +3 return: host found in table.  Registers loaded on this return:
+;	1/	pointer to ASCIZ of full, official host name
+;	2/	host address, in 32-bit format, same as hostAddress given
+;	3/	host Status Word, in given format.
+
+HstNum::move	t2,t1		; Put arg in T2.
+	jrst	HstNu0		;  skip over invalidation code.
+HstNuX:	move	t4,LowHTS##	; Invalidate timestamp, too.
+	addi	t4,^D1234
+	tlo	t4,600000	;  make sure it can't be a timestamp
+	movem	t4,LowHTS##
+HstNu0:	pushj	p,HstOpn##	; Make the host table addressable.
+	  jrst	[skipg ShrPtr##	; can't read.  Got an old one?
+		   popj	p,	;  nope; CPOPJ return.
+		 jrst	HstNu1]	;  yes; just use it.
+	  jfcl			; OK to have just built it now.
+HstNu1:	skipg	t4,ShrPtr##	; Grab pointer to shared table data.
+	  halt	cpopj##		;  Shouldn't happen!
+HstNu2:	skipn	(t4)		; Are we at the end yet?
+	  jrst	HstNuZ		;  yes--clean up.
+	camn	t2,$htNum(t4)	; Is this the address we're looking for?
+	  jrst	HstNuG		; Yes!  Done.
+	skiple	t3,$htLen(t4)	; No.  Try to read size of this entry,
+	 camle	t3,ShrMax##	;  allowing it to change out from under us!
+	  jrst	HstNuX		;   Out of range!  Re-check table, from zero.
+	addi	t4,(t3)		; Good range; bump pointer by it.
+	jrst	HstNu2		; try for next entry.
+
+HstNuG:	movsi	t1,$htTxt(t4)	; Address compared; save (volatile) data.
+	hrri	t1,NamNum
+	blt	t1,NamNum+BufWds-1
+	movei	t1,NamNum	; Set up values for return
+	move	t3,$htAtr(t4)	; T2 still has address from start.
+	pushj	p,HstVld##	; Are timestamps still OK?
+	  caia			;  can't read; use what's there.
+	  jrst	HstNu1		; No, it changed!  Re-do from the beginning.
+	jrst	CPopj2##	; Yes, all square.  Give it back.
+
+HstNuZ:	pushj	p,HstVld##	; Maybe table changed and we should retry.
+	  caia			;  nope; use what's there.
+	  jrst	HstNu1		;  Yes; redo the search.
+	jrst	CPopj1##	;  No; return failure.
+
+	reloc	0		; Low segment space
+NamNum:	block	BufWds		; Big enough for a name
+	reloc
+
+prgend
+	Title	HstNam -- find name in Arpanet host table
+	subttl	C.F.Everhart -- 27 May 1980
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, Tulip, HstTbl
+
+	entry	HstNam
+
+; HstNam -- look up a name in the Arpanet host table.  Detailed specifications
+;   are in the client-level manual which is the first section of this file.
+; Briefly, our sole argument is an ASCIZ string pointed to by T1.  We return
+;   CPOPJ if the host table isn't to be found, CPOPJ1 if the table is there
+;   but we found no match (with T1 negative if unknown, positive if ambig),
+;   and CPOPJ2 if we found a good match.  On the good-match return, we load
+;   T1 with a pointer to the full ASCIZ host name, T2 with the host number,
+;   and T3 with the host status word (attributes).
+; The interesting thing about the implementation is that we use another user-
+;   level routine in doing our job: we call HstGen to examine all the names.
+; Our algorithm is to look at all hosts, finding the longest initial string
+;   among all names that partially match the given name.  We then truncate
+;   any trailing hyphens on the name, then we look for an exact match for
+;   this resultant (and bizarre) string.  Thus we do disambiguation sometimes.
+
+HstNam::setzm	NamHBf		; Copy over the argument name
+	move	t2,[xwd NamHBf,NamHBf+1]
+	blt	t2,NamHBf+BufWds-1
+	setzm	NamHBX		; Clear out where we'll build the matcher
+	move	t2,[xwd NamHBX,NamHBX+1]
+	blt	t2,NamHBX+BufWds-1
+	tlc	t1,000700	; Make sure byte size on pointer is 7.
+	tlcn	t1,000700
+	 tlne	t1,007000	; If not,
+	  hrli	t1,(<point 7,0>)	;  make it this guy.
+	move	t2,[point 7,NamHBf]
+	movei	t3,BufWds*5-1
+HstNa1:	ildb	t4,t1		; Each source character.
+	jumpe	t4,HstNa2
+	idpb	t4,t2
+	sojg	t3,HstNa1
+HstNa2:	setom	NamCnt		; Initialize these two loop vbls
+	setzm	NamHN
+	movei	t1,NamHBf	; We want all matches for the argument.
+	movei	t2,NamHst	; Call NamHst when we get a host
+	movei	t3,NamNck	;  and NamNck on each nickname.
+	pushj	p,HstGen##	; Do it!
+	  popj	p,		;  damn it, something lost.
+	 skipa	t1,[-1]		; No matches!  Well, we know what to return.
+	  jrst	HstNa3
+	jrst	CPopj1##	; No-such-host, of course.
+HstNa3:			; NamHBX now has the longest common match.
+	move	t1,[point 7,NamHBX]	; Remove trailing hyphens.
+	movei	t2,BufWds*5-1
+HstNa4:	ildb	t3,t1		; Get each character.
+	jumpe	t3,HstNa6	;  end of string; done
+	move	t4,t1		; Copy non-hyphen pointer.
+HstN41:	cain	t3,"-"		; A bad guy?
+	  jrst	HstNa5
+	sojg	t2,HstNa4	; no; get them all.
+	jrst	HstNa6		; Done with this fixup.
+HstNa5:	ildb	t3,t1		; Are we at end-of-string?
+	jumpn	t3,HstN41	;  no, but this might just be a hyphen, too.
+	dpb	t3,t4		; Yes; overwrite the hyphen with the nul.
+HstNa6:			; We now want an exact match for the name in NamHBX.
+	setzm	NamHN		; No memory of host number
+	setom	NamCnt		;  init count
+	setzm	NamMHN		; Count exact matches, also.
+	setom	NamMCt
+	setzm	NamHBA		; Stick answer here.
+	move	t4,[xwd NamHBA,NamHBA+1]
+	blt	t4,NamHBA+BufWds-1
+	setzm	NamAdr
+	setzm	NamSts
+	setzm	NamHBM		; Stick answer here, too
+	move	t4,[xwd NamHBM,NamHBM+1]
+	blt	t4,NamHBM+BufWds-1
+	setzm	NamMAd		; answers from exact-match
+	setzm	NamMSt
+	movei	t1,NamHBX	; Pass HstGen this name,
+	movei	t2,NamHNm	;  and call these on matches.
+	movei	t3,NamHNm
+	pushj	p,HstGen##
+	  popj	p,		;  a royal pain!
+	  jrst	HstNa2		;  Start the whole shebang over.
+	skipe	NamMCt		; Exactly one exact match?
+	  jrst	HstNa7		;  no; see what else we found.
+	movei	t1,NamHBM	; Get the matched name; return it.
+	move	t2,NamMAd	;  other stuff, too
+	move	t3,NamMSt
+	jrst	CPopj2##
+HstNa7:
+	skipe	t1,NamCnt	; See what we came up with.
+	  jrst	CPopj1##	;  Ambiguous or not found.
+	movei	t1,NamHBA	; Return the things we saved.
+	move	t2,NamAdr
+	move	t3,NamSts
+	jrst	CPopj2##	; A winner!
+
+NamHst:	skipn	NamHN		; Called on initial match.  Saved a host?
+	  aos	NamCnt		;  no, but count anyway.
+	skipn	NamHN		; Want to save one?
+	  movem	t2,NamHN
+	came	t2,NamHN	; This is to allow for retry.
+	  aos	NamCnt
+NamNck:	pushj	p,Save1##	; Get a register.
+	movei	p1,(t1)		; Save the passed-in name.
+	movei	t2,(t1)		; Gotta find out if this name matched:
+	movei	t1,NamHBf	;  so re-do the match.
+	pushj	p,UlIni##	; Does NamHBf begin (t1)?
+	  popj	p,		;  nope; ignore this name.
+	movei	t1,(p1)		; Yes; set up for string copy or compare.
+	hrli	t1,(<point 7,0>)
+	move	t2,[point 7,NamHBx]	; Where we're building!
+	movei	t3,BufWds*5-1
+	skipe	NamHBx		; Is there a name there yet?
+	  jrst	NamHsx		;  yes.
+NamHx1:	ildb	t4,t1		; No; copy this one!
+	jumpe	t4,cpopj##	;  all done; await next.
+	idpb	t4,t2
+	sojg	t3,NamHx1
+	popj	p,
+NamHsz:	sojle	t3,NamHxx	; keep count straight, also.
+NamHsx:	ildb	t4,t1		; String Compare!
+	ildb	p1,t2
+	jumpe	p1,CPopj##	; Truncate (t2) to longest match for (t1)
+	jumpe	t4,NamHxx	;  gotta truncate it, below.
+	xori	p1,(t4)		; Both are there; compare chars.
+	jumpe	p1,NamHsz	;  same; keep rolling.
+	trne	p1,137		; Any real differences?
+	  jrst	NamHxx		;  yes
+	movei	p1,(t4)		;  maybe; copy character
+	andcmi	p1,40		; make UC alpha
+	cail	p1,"A"		; Is it alpha at all?
+	 caile	p1,"Z"
+	  jrst	NamHxx		;  nope, truncate.
+	sojg	t3,NamHsx
+NamHxx:	movei	t1,0		; truncate (t2)
+	dpb	t1,t2		;  like this.
+	popj	p,
+
+NamHNm:	pushj	p,Save4##
+	skipn	NamHN		; How's our count to be?
+	  aos	NamCnt		;  off by one; compensate.
+	skipn	NamHN		; New host?
+	  movem	t2,NamHN	;  need to save one.
+	came	t2,NamHN	; New host?
+	  aos	NamCnt		;  Yes indeed.
+	movem	t2,NamAdr	; Our best estimate, should this be unique.
+	movem	t3,NamSts
+	setzm	NamHBA		;  copy name to non-volatile place
+	move	p1,[xwd NamHBA,NamHBA+1]
+	blt	p1,NamHBA+BufWds-1
+	movei	p1,BufWds*5-1
+	move	p2,[point 7,NamHBA]
+	movsi	p4,(<point 7,0>)	; Copy host-name ptr
+	hrri	p4,(t4)
+NamHN1:	ildb	p3,p4
+	jumpe	p3,NamHN2
+	idpb	p3,p2		; save character
+	sojg	p1,NamHN1
+NamHN2:	movei	p1,(t1)		; Copy this-name pointer.
+	move	p2,t2		;  and save other results of search
+	move	p3,t3
+	movei	p4,(t4)
+	movei	t2,NamHBX	; Check for strict equality.
+	pushj	p,UpEq##
+	  popj	p,		;  no go; aren't you glad we didn't clobber memory?
+	skipn	NamMHN		; How's our count to be?
+	  aos	NamMCt		;  off by one; compensate.
+	skipn	NamMHN		; New host?
+	  movem	p2,NamMHN	;  need to save one.
+	came	p2,NamMHN	; New host?
+	  aos	NamMCt		;  Yes indeed.
+	movem	p2,NamMAd	; Our best estimate, should this be unique.
+	movem	p3,NamMSt
+	hrli	p4,(<point 7,0>)
+	setzm	NamHBM		;  copy name to non-volatile place
+	move	t1,[xwd NamHBM,NamHBM+1]
+	blt	t1,NamHBM+BufWds-1
+	movei	t1,BufWds*5-1
+	move	t2,[point 7,NamHBM]
+NamHN3:	ildb	t3,p4
+	jumpe	t3,CPopj##
+	idpb	t3,t2		; save character
+	sojg	t1,NamHN3
+	popj	p,		; Back to HstGen
+	
+
+	reloc	0		; Low segment
+NamHN:	block	1		; Host Number we're looking at
+NamCnt:	block	1		; Count of hosts we've seen
+NamMHN:	block	1		; Host Number we're looking at, exact matches
+NamMCt:	block	1		; Count of hosts we've seen, exact matches
+NamAdr:	block	1		; Where to stick host address and status when
+NamSts:	block	1		;  we're juggling registers.
+NamMAd:	block	1		; Match: Where to stick host address and status when
+NamMSt:	block	1		;  we're juggling registers.
+NamHBf:	block	BufWds		; Copy argument to here
+NamHBX:	block	BufWds		; make our long-match here
+NamHBA:	block	BufWds		; Where we put the answer-name.
+NamHBM:	block	BufWds		; Where we put the Match answer-name.
+	reloc
+
+prgend
+	title	HstGen -- generate Arpanet host names matching argument
+	subttl	C.F.Everhart -- 27 May 1980
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, Tulip, HstTbl
+
+	entry	HstGen
+
+; HstGen -- routine to call user with each Arpanet host that matches the
+;   argument name.  Parameters are the ASCIZ name to match in T1, the
+;   host/nickname routines in T2/T3.  CPOPJ return means that the host table
+;   is unreadable; CPOPJ1 means there were no matches for the given name;
+;   CPOPJ2 means at least one host was found, and the routines called.
+;   Further specifications are in the client document at the beginning of
+;   this file.
+
+HstGen::push	p,p1		; SAVEn loses with CPOPJ2; grumble.
+	push	p,p2
+	push	p,p3
+	hrrzm	t2,.GnHst##	; (use .GHost)
+	hrrzm	t3,.GnNck##
+	setzm	HGArg		; Put argument into non-volatile place.
+	move	t2,[xwd HGArg,HGArg+1]
+	blt	t2,HGArg+BufWds-1	;  after clearing destination.
+	tlc	t1,000700	; Make sure pointer's byte size is 7.
+	tlcn	t1,000700
+	 tlne	t1,007000
+	  hrli	t1,(<point 7,0>)	;  else force this one on it.
+	move	t2,[point 7,HGArg]
+	movei	t3,BufWds*5-1	; How many chars to copy, max
+HGArg1:	ildb	t4,t1
+	jumpe	t4,HGArg2
+	idpb	t4,t2
+	sojg	t3,HGArg1
+	jrst	HGArg2
+HGxxxx:	move	t4,LowHTS##	; Invalidate the timestamp!
+	addi	t4,^D1284
+	tlo	t4,600000
+	movem	t4,LowHTS##
+HGArg2:	pushj	p,HstOpn##	; Establish a table we can read.
+	  jrst	[skiple	ShrPtr##	; Can't update.  Anything there?
+		   jrst	HstGn1		;  yes; use it anyway.
+		 pop	p,p3		;  No; have to clean up and CPOPJ.
+		 pop	p,p2
+		 pop	p,p1
+		 popj	p,]
+	  jfcl			; Don't care if it's a new table.
+HstGn1:	setom	GenCnt##	; Initialize this.
+	skipg	p1,ShrPtr##	; This better be available
+	  halt	HstGn1
+HstGn2:	skipn	(p1)		; At end of table?
+	  jrst	HstGnZ		;  yes; terminate
+	movei	t1,HGArg	; Check for a partial match.
+	movei	t2,$htTxt(p1)
+	pushj	p,UlIni##	; Is (T1) an initial substring of (T2)?
+	 caia			;  no.
+	  jrst	HstGn8		;  Yes; pass this host to user.
+	skiple	p2,$htNLn(p1)	; Pick up count from volatile memory
+	 camle	p2,ShrMax##
+	  jrst	HGxxxx		;  clobbered; restart.
+	skiple	p3,$htLen(p1)	; Same for another count.
+	 camle	p3,ShrMax##
+	  jrst	HGxxxx
+	subi	p3,$htNLn-1+1(p2)	; P3 gets count of nickname words.
+	jumple	p3,HstGn9	; Onwards, to next host.
+	addi	p2,$htNLn(p1)	; Make P2 an absolute pointer.
+HstGn3:	movei	t1,HGArg	; Is the arg a match for any nickname?
+	movei	t2,$NmTxt(p2)
+	pushj	p,UlIni##
+	 caia			;  not this one, anyway
+	  jrst	HstGn8		;  Yup, pass this one back.
+	skiple	t1,$NmLen(p2)	; Get volatile count again.
+	 camle	t1,ShrMax##
+	  jrst	HGxxxx		;  start *all over*
+	subi	p3,(t1)		; Decr count by entry size,
+	jumple	p3,HstGn9	;  if done, skip to next host;
+	addi	p2,(t1)		;  if not, bump absolute pointer.
+	jrst	HstGn3		; Try next nickname.
+
+HstGn8:	pushj	p,.GHost##	; Give the user this host; it's a winner.
+	 caia			;  all OK with table
+	  jrst	HGxxxx		;  Damn it, have to restart!
+HstGn9:	skiple	t1,$htLen(p1)	; Done with this host; get entry size,
+	 camle	t1,ShrMax##	;  from volatile memory, so range-check.
+	  jrst	HGxxxx		;  Damn it again.
+	addi	p1,(t1)		; Bump pointer
+	jrst	HstGn2		;  and look for the next host.
+
+HstGnZ:	pushj	p,HstVld##	; Done.  Did we get everything?
+	  caia			;  No, but we have to fake it.
+	  jrst	HstGn1		;  No, but we can do better.
+	pop	p,p3		; All OK.  Restore clobbered registers.
+	pop	p,p2
+	pop	p,p1
+	aos	(p)		; CPOPJ1 return if no hits
+	skipl	t1,GenCnt##	; but if any at all,
+	  aos	(p)		;  CPOPJ2.
+	popj	p,
+
+	reloc	0		; Low segment
+HGArg:	block	BufWds		; Space to hold argument while we look.
+	reloc
+
+prgend
+	Title	HstNGn -- generate Arpa hosts based on number and mask
+	subttl	C.F.Everhart -- 27 May 1980
+
+	TwoSegments
+	reloc	400000
+	search	HstTbl, MacTen, UUOSym, Tulip
+
+	entry	HstNGn
+
+; HstNGn -- act as a generator of hosts/nicknames given a host number and
+;   a mask for those bits that are to be considered relevant.  Parameters
+;   are number in T1, mask in T4, and host/nickname routines in T2 and T3.
+; Routine CPOPJ returns if host table is unreadable, CPOPJ1 if no matching
+;   hosts found, CPOPJ2 if some hosts were found, some routines were called.
+
+HstNGn:	push	p,p1		; Save these guys; SAVEn don't CPOPJ2 well.
+	movem	t1,NGnNum	; Remember parameters.
+	hrrzm	t2,.GnHst##	; (Use .GHost)
+	hrrzm	t3,.GnNck##
+	movem	t4,NGnMsk
+	jrst	HstNG0
+HstNGX:	move	t4,LowHTS##	; Invalidate the file timestamp.
+	subi	t4,^D1474
+	tlo	t4,600000
+	movem	t4,LowHTS##
+HstNG0:	pushj	p,HstOpn##	; Let us touch the host table.
+	  jrst	[skiple	ShrPtr##	; Oops.  Anything there?
+		   jrst	HstNG1		;  yes; use it
+		 pop	p,p1		; No!  Restore and popj.
+		 popj	p,]		;  ..out of here..
+	  jfcl			;  don't care, as long as it's there now.
+HstNG1:	setom	GenCnt##	; Initialize count of matches.
+	skipg	p1,ShrPtr##	; Get pointer to volatile area.
+	  halt	.-1		;  oops
+HstNG2:	skipn	(p1)		; End of table?
+	  jrst	HstNGZ		;  yes; clean up.
+	move	t1,$htNum(p1)	; Get host number from this host
+	xor	t1,NGnNum	; Differences with asked-for
+	tdnn	t1,NGnMsk	; Any of them count?
+	 pushj	p,.GHost##	;  No!  Call user's routines.
+	 caia			;   all OK
+	  jrst	HstNGX		; Fooey, we have to restart.
+	skiple	t1,$htLen(p1)	; Pick up volatile count, again.
+	 camle	t1,ShrMax##	; Cheapo range-check.
+	  jrst	HstNGX		;  no go; restart.
+	addi	p1,(t1)		; Safe to advance.
+	jrst	HstNG2
+
+HstNGZ:	pushj	p,HstVld##	; Done.  Are we sure we've seen it all?
+	  caia			;  no, but gotta make a living.
+	  jrst	HstNG1		;  No; restart scan.
+	pop	p,p1		; All consistent.  Put register back.
+	aos	(p)		; CPOPJ1 if none seen,
+	skipl	GenCnt##	; but if there was at least one,
+	  aos	(p)		;  we CPOPJ2.
+	popj	p,
+
+	reloc	0		; Low segment
+NGnNum:	block	1		; Space for host number to match
+NGnMsk:	block	1		; Space for mask under which to do match
+	reloc
+
+prgend
+	Title	.GHost -- send a generated host name back to caller.
+	subttl	C.F.Everhart -- 27 May 1980
+
+	TwoSegments
+	reloc	400000
+
+	entry	.GHost
+	search	HstTbl, MacTen, UUOSym, Tulip
+
+; .GHost is an internal routine that will pass back generated hosts to the
+;   caller, futzing with the volatile shared host table copy and all.
+; Registers T1 thru T4 are trashed.  The CPopj return signifies that all is
+;   OK, while the CPopj1 return says that the table needs revalidation, and
+;   the generation process needs to be restarted.
+; Call with P1 pointing to host entry to be passed back.
+
+.GHost::pushj	p,Save3##	; Need three preserved registers.
+	aos	GenCnt		; Count this host for user.
+	movsi	t1,$htTxt(p1)	; Save text in non-volatile buffer
+	hrri	t1,GenTB1
+	blt	t1,GenTB1+BufWds-1
+	movei	t1,GenTB1	; Now set up arguments to be returned.
+	move	t2,$htNum(p1)	; Host address
+	move	t3,$htAtr(p1)	;  and attributes.
+	movei	t4,GenTB1	; For symmetry when calling Nickname routine.
+	pushj	p,HstVld##	; Is what we're looking at consistent?
+	  caia			;  no, but we pretend rather than crumple.
+	  jrst	CPopj1##	;  No; we just regenerated.  Signal!
+	skipe	.GnHst		; OK.  Is there a routine to call?
+	  pushj	p,@.GnHst	;  Yes.  Call user.
+	skipn	.GnNck		; Fine.  Any nickname routine?
+	  popj	p,		;  No, so we're done!
+	skiple	p2,$htNLn(p1)	;  Yes.  Get length of host name.
+	 camle	p2,ShrMax##	; Also check for rotting memory.
+	  jrst	CPopj1##
+	skiple	p3,$htLen(p1)	; Same for length of entry.
+	 camle	p3,ShrMax##
+	  jrst	CPopj1##
+	subi	p3,$htNLn-1+1(p2)	; Get words of nicknames left,
+	jumple	p3,CPopj##	;  and end when done.
+	addi	p2,$htNLn(p1)	; Make absolute pointer to first nickname.
+.GHst1:	movsi	t1,$NmTxt(p2)	; Copy nickname text.
+	hrri	t1,GenTB2	;  (separate buffer)
+	blt	t1,GenTB2+BufWds-1
+	movei	t1,GenTB2	; Pointer to nickname text
+	move	t2,$htNum(p1)	; Arpanet host number
+	move	t3,$htAtr(p1)	; Host attributes
+	movei	t4,GenTB1	; and official host name.
+	pushj	p,HstVld##	; Now, see if we're consistent.
+	  caia			;  Indeed we're not, but do with what we have.
+	  jrst	CPopj1##	;  Nope; let's start this mess over.
+	pushj	p,@.GnNck	; Call user's nickname routine.
+	skiple	t1,$NmLen(p2)	; OK.  Pick up length of this nickname.
+	 camle	t1,ShrMax##	;  make sure it's reasonable
+	  jrst	CPopj1##	;   nope.
+	subi	p3,(t1)		; Count that many words.
+	jumple	p3,CPopj##	; when none left, we're done.
+	addi	p2,(t1)		; Bump our absolute pointer.
+	jrst	.GHst1		; Give user this one, too.
+
+	reloc	0		; Low segment
+.GnHst::block	1		; Routine for host data
+.GnNck::block	1		; Routine for nicknames
+GenCnt::block	1		; Count the hosts passed back.
+GenTB1:	block	BufWds		; Two non-volatile buffers to hold name text.
+GenTB2:	block	BufWds
+	reloc
+
+prgend
+	Title	HstOpn -- See if we need to update host information.
+	subttl	C.F.Everhart -- 22 May 1980
+
+	entry	HstOpn
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, HstTbl, Tulip
+
+; Routine to begin a call on an IMPSUB lookup function.  If we're initialized,
+;   we call HstChk; otherwise, we call HstTim to see how long it's been since
+;   we looked at any of the HOSTS.* files.
+; Call:
+;	pushj	p,HstOpn
+;	  +1 return: can't access host tables
+;	  +2 return: all's well with the host table, after a rebuild.
+;	  +3 return: all was well with the table, no action necessary.
+
+HstOpn::skipe	LowHTS##	; Have we initialized anything?
+	  pjrst	HstVld##	;  Yes; just see if timestamps still OK.
+	pjrst	HstTim##	;  Nope; better see what time it is, also.
+
+	prgend
+	Title	HstTim -- See whether it's time to HstChk yet
+	subttl	C.F.Everhart -- 16 May 1980
+
+	entry	HstTim
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, HstTbl, Tulip
+
+; Routine to look at the time of day and decide whether it's time yet to
+;   LOOKUP the host tables to see if they've changed.
+; Call:
+;	pushj	p,HstTim
+;	  +1 return: can't access host tables
+;	  +2 return: all's well with the host table, after a rebuild.
+;	  +3 return: all was well with the table, no action necessary.
+
+HstTim::push	p,t1		; Save some registers
+	push	p,t2
+	movx	t1,%CnDTm	; Get time in universal, monotonic format
+	GetTab	t1,
+	  movsi	t1,123456	; [not known to fail recently]
+	subi	t1,<<1,,0>/^D24>	; Subtract 1/24th of a day
+	camle	t1,ShrChk##	; Is ShrChk more than an hour ago?
+	  pjrst	HstTC		; Yes; better check the disk files.
+	skipn	LowHTS##	; Are we at all initialized?
+	 skipe	LowATS##
+	  jrst	HstTV		;  yes; best to check timestamps also.
+	skiple	t1,ShrHTS##	; Are the timestamps valid?
+	 skipg	t2,ShrATS##
+	  pjrst	HstTC		; No; better join the fray.
+	movem	t1,LowHTS##	; Yes, both are.  Save them as our own.
+	movem	t2,LowATS##
+	jrst	HstTZ		; Return that life is fine.
+HstTC:	pushj	p,HstChk##	; Check our source files
+	  sos	-2(p)		;  no-skip return
+	  sos	-2(p)		;  single-skip return
+HstTZ:	pop	p,t2		; Put these back
+	pop	p,t1
+	jrst	CPopj2##
+
+HstTV:	pop	p,t2		; put these back
+	pop	p,t1
+	pjrst	HstVld##	;  and play with timestamps.
+
+	prgend
+	Title	HstVld -- Validate the correctness of the host table.
+	subttl	C.F.Everhart -- 16 May 1980
+
+	entry	HstVld
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, HstTbl, Tulip
+
+; Routine to check that we know the host table to be valid.  We compare
+;   the private timestamps of the two host table files with the public
+;   versions.  If either is different, we call HstChk to rebuild the
+;   data structure ourselves.
+; Call:
+;	pushj	p,HstVld
+;	  +1 return: host tables inaccessible
+;	  +2 return: host table OK, but we had to rebuild
+;	  +3 return: host table timestamps were fine, no action necessary.
+
+HstVld::push	p,t1		; Save a couple registers.
+	push	p,t2
+	move	t1,ShrHTS##	; Pick up shared values for timestamps.
+	move	t2,ShrATS##
+	camn	t1,LowHTS##	; If either one disagrees with private,
+	 came	t2,LowATS##
+	 caia			;  go rebuild everything.
+	  jrst	HstV2		;  no, all fine
+	pushj	p,HstChk##	; Check it out.
+	  sos	-2(p)		;  bogus; no-skip
+	  sos	-2(p)		;  rebuilt; one skip.
+HstV2:	pop	p,t2		; Put registers back.
+	pop	p,t1
+	jrst	CPopj2##	; Return CPOPJ2 or CPOPJ1 or CPOPJ.
+
+	prgend
+	Title	HstChk -- Rebuild host table if new file
+	subttl	C.F.Everhart -- 16 May 1980
+
+	entry	HstChk, CPopj2
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, HstTbl, Tulip, Imp
+
+	Hst==0		; I/O channel for reading host files.
+
+; Routine to LOOKUP the host tables to see if we need to rebuild the in-memory
+;   copies of them.
+; Call:
+;	pushj	p,HstChk
+;	  +1 return: can't access host tables
+;	  +2 return: had to rebuild table, all OK now.
+;	  +3 return: all was just fine with the host table
+
+HstChk::push	p,t3		; Save some temp registers.
+	push	p,t4
+	push	p,IFile##	; Push TULIP's current input stream.
+	push	p,.JbRel##	; Save old core size, too.
+	FSetup	FilAst		; Look at HOSTS.ADD first.
+	FIOpen	HstFil
+	pushj	p,TimeSt	; Compute a timestamp for the file,
+	movem	t1,LowATS	;  and save for later comparison.
+
+HstAd1:			; Here if couldn't find HOSTS.ADD.
+	FSetup	FilHst		; Now look at HOSTS.TXT.
+	FIOpen	HstFil
+	pushj	p,TimeSt	; Compute a timestamp for the file,
+	movem	t1,LowHTS	;  and save for later comparison.
+
+	movx	t3,%CnDTm	; Remember when we looked.
+	GetTab	t3,
+	  movsi	t3,123456
+
+	setz	t4,		; Prepare to write into high segment.
+	SetUWP	t4,
+	  jrst	HstErX		; Exit doing nothing; we lose.
+	movem	t3,ShrChk	; Remember when we looked.
+	move	t1,LowHTS	; Get file timestamps: HOSTS.TXT
+	move	t2,LowATS	;  and HOSTS.ADD.
+	camn	t1,ShrHTS	; If they're both the same,
+	 came	t2,ShrATS	;  take the OK exit.
+	 skipa	t3,ShrHTS	; Otherwise, invalidate them completely!
+	  jrst	HstErK
+	subi	t3,^D920
+	tlo	t3,400000	; this bit can never be validly on.
+	came	t1,ShrHTS	; If ShrHTS is out of date,
+	  movem	t3,ShrHTS	;  make it obviously invalid.
+	move	t3,ShrATS	; Same for ShrATS.
+	subi	t3,^D930
+	tlo	t3,400000
+	came	t2,ShrATS
+	  movem	t3,ShrATS
+
+	pushj	p,HstBld	; Go off and rebuild the host table!
+	  jrst	HstErX		; (oops, something went wrong)
+	move	t1,LowHTS	; Now that it's done, publicize our
+	move	t2,LowATS	;  computed file timestamps.
+	movem	t1,ShrHTS
+	movem	t2,ShrATS
+
+	caia			; Just CPOPJ1; we had to change it.
+HstErK:	  aos	-4(p)		; Take the all-was-OK-anyway CPOPJ2 return.
+	aos	-4(p)
+HstErX:	movei	t1,1		; Non-skip return.  Re-enable write
+	SetUWP	t1,		;  protection on high segment.
+	  jfcl			;  (what to do?)
+	release	Hst,
+	pop	p,t1		; Get back saved .JbRel.
+	came	t1,.JbRel##	; If different,
+	 Core	t1,		;  cut back core;
+	  jfcl			;   but should always work.
+	pop	p,IFile##	; Restore this item.
+	pop	p,t4		;  also some registers.
+	pop	p,t3
+	popj	p,		; Return skip or non-skip.
+
+; TimeSt -- builds a timestamp word out of the LOOKUP results in the
+;   TULIP block HstFil.  Result in T1, clobbers T2.
+TimeSt:	move	t1,HstFil+FilNam+1	; Get RB.CRX field from LOOKUP
+	andi	t1,Rb.CrX
+	move	t2,HstFil+FilNam+2	; now for RB.CRD and RB.CRT
+	andx	t2,<Rb.CrD!Rb.CrT>	; clear all but them
+	lsh	t1,^D11		; Shift RB.CRX left of RB.CRT
+	ior	t1,t2		; Merge the two into a single timestamp.
+	popj	p,		; Return with timestamp in T1.
+
+CPopj2::aos	(p)		; Double-skip return.
+	jrst	CPopj1##
+
+; AddNF -- ignore absence of HOSTS.ADD file; validate TS.
+AddNF:	setzm	LowATS		; Keep this meaningful.
+	jrst	HstAd1		;  back to check HOSTS.TXT
+	subttl	HstBld -- Rebuild the host table
+
+; HstBld -- build the in-memory Arpanet host table structure from the
+;   source files SYS:HOSTS.TXT and SYS:HOSTS.ADD.  Return CPOPJ1 if all
+;   went well, CPOPJ if something went amiss.
+; Conditions on entry: SYS:HOSTS.TXT is open for Tulip reading.  The high
+;   segment is write-enabled.
+; This routine should overwrite LowATS with a re-computed timestamp
+;   after LOOKUPing HOSTS.ADD.
+
+HstBld:	push	p,.JbFF##	; Remember free pointer.
+	inbuf	Hst,2		; Get buffers now, so that we can grow past.
+	move	t1,.JbFF##	; Construct a pointer to a free space.
+	movem	t1,HstBas	; Save base pointer here.
+	setom	LowMax		; Initialize to save a maximum.
+
+	movei	t1,TxtRd	; Point to Hosts.Txt productions.
+	pushj	p,LexInt##	; Interpret them; build the host table.
+	  jrst	HstErZ		;  ..whoops, no go..
+	movei	t2,1
+	pushj	p,AddWds	; Put a zero at its end.
+	  jrst	HstErZ		; failed on the last word!!!
+	setzm	(t3)
+
+; Now read in the HOSTS.ADD corrections.
+	move	t1,(p)		; Restore .JBFF
+	push	p,.JbFF##	;  but save it first
+	movem	t1,.JbFF##
+	FSetup	FilAsz		; New I/O block for this
+	FIOpen	HstFil
+	pushj	p,TimeSt	; Get new timestamp
+	movem	t1,LowATS
+	inbuf	Hst,2		; Re-use the buffers
+	pop	p,.JbFF##	; Put free pointer back for real.
+	movei	t1,AddRd	; Other set of productions.
+	pushj	p,LexInt##
+	  jfcl			; oh well: they were only updates anyway.
+HstBl1:			; Here if couldn't find HOSTS.ADD.
+	move	t2,LowMax	; Need .LowMax new words, all zeroes.
+	caige	t2,BufWds	; (gotta be at least BufWds big.)
+	  movei	t2,BufWds
+	pushj	p,AddWds
+	  jrst	HstErZ		;  nope, we really need them!
+	setzm	(t3)		; Have them; now we need them zeroed.
+	movsi	t2,0(t3)
+	hrri	t2,1(t3)
+	add	t3,LowMax
+	blt	t2,-1(t3)	; This will do it.
+
+; Table is built in HstBas:.JbFF; transfer it to high segment.
+	move	t1,.JbFF##	; Get top of table.
+	sub	t1,HstBas	; get its length
+	hlrz	t2,.JbHRl##	; Free pointer in high segment
+	movei	t2,377777(t2)	; Convert to address of last used in high seg
+	addi	t1,(t2)		; Get highest needed address.
+	hrrz	t3,.JbHRl##	; Get highest available address
+	caig	t1,(t3)		; Is high seg big enough already?
+	  jrst	HstErA		;  Yes; just do the transfer.
+	movsi	t1,(t1)		;  No.  Prepare to expand the high seg alloc.
+	Core	t1,
+	  jrst	HstErZ		; Grumble!  Should be able to do it!
+HstErA:	movs	t3,HstBas	; First word to move from.
+	hrri	t3,1(t2)	; First word to move into.
+	movei	t4,(t3)		; Remember high-seg start of table.
+	move	t1,.JbFF##	; Get length of thing to move again
+	sub	t1,HstBas
+	addi	t2,(t1)		; Compute last address to move into,
+	blt	t3,(t2)		;  and do it!!!
+	movem	t4,ShrPtr	; Store ptr to highseg, finally!
+	move	t4,LowMax	; Copy our max entry-size, also.
+	movem	t4,ShrMax
+
+	aos	-1(p)		; Set for good return.
+HstErZ:	pop	p,.JbFF##	; Set back free pointer.
+	popj	p,		; Skip or not.
+
+; AddNFx -- if can't find HOSTS.ADD the second time.
+AddNFx:	setzm	LowATS		; The null timestamp
+	pop	p,.JbFF##	; Put this back,
+	jrst	HstBl1		;  then back in step to finish.
+	subttl	Productions to parse HOSTS.TXT
+	; Freely lifted from Taft version, CFE
+
+	sall	; flush ascii expansion
+
+	tblbeg	TxtRd
+
+TxtRd0:!PROD(	<BLANK!BREAK>		,    ,*,TxtRd0) ; Ignore blanks
+	PROD(	-SEMI			,NHST, ,TxtRd2) ; Comment?
+TxtRd1:!PROD(	-<BREAK>		,    ,*,TxtRd1) ;  Yes; ignore line
+	PROD(	<SG>			,    , ,TxtRd0) ; EOL: next line.
+TxtRd2:!PROD(	<SG>			,CALL, ,TxtNam) ; Get a name string.
+	PROD(	-comma			,RET , ,      )	; Comma must follow.
+	PROD(	<SG>			,CALL,*,TxtNum)	; Now get a number;
+	PROD(	-"/"			,RET , ,      )	;  err if not a "/"
+	PROD(	<SG>			,CALL,*,TxtNum)	; Get another number!
+	PROD(	-<BREAK>		,RET , ,      )	;  err if not EOL.
+	PROD(	<SG>			,EHST,*,      )	; Call A.EHST to setup
+; Here to scan attribute lines, while they hold out.
+TxtRd3:!PROD(	<BREAK>			,    ,*,TxtRd0)	; Blankline -> top.
+	PROD(	<SG>			,CALL, ,TxtNam)	; Get name of attr.
+	PROD(	-"="			,RET , ,      )	;  must have "=" now
+	PROD(	<SG>			,STSP,*,      )	; Was it "STATUS="?
+	PROD(	<SG>			,    , ,TxtRd4)	;  no, keep looking
+; Here when attribute was "STATUS=" -- see what keyword was.
+	PROD(	<SG>			,CALL, ,TxtNam)	; Get the keyword
+	PROD(	-<BREAK>		,RET , ,      )	;  err if not EOL
+	PROD(	<SG>			,STSS,*,TxtRd3)	; Store sts and TxtRd3
+; Attr wasn't "STATUS=" -- keep looking.
+TxtRd4:!PROD(	<SG>			,NCKP, ,      )	; Is it "NICKNAMES="?
+	PROD(	<SG>			,    , ,TxtRd1)	;  No; discard line!
+; Here when attribute was nickname-list.  Keep scanning them.
+TxtRd5:!PROD(	<SG>			,CALL, ,TxtNam)	; Get a name.
+	PROD(	<SG>			,NCKS, ,      )	;  store it as nickn.
+	PROD(	comma			,    ,*,TxtRd5)	; Back for more on ","
+	PROD(	<BLANK>			,    ,*,TxtRd5)	;  or blank:
+	PROD(	-<BREAK>		,RET , ,      )	; Must be that or brk
+	PROD(	<SG>			,    ,*,TxtRd3)	; More attrs!
+
+; TxtNam scans a host identifier string.
+TxtNam:!PROD(	<SG>			,NAIN, ,TxtNa1)	; Init name
+TxtNa1:!PROD(	<BLANK>			,    ,*,TxtNa1)	; Flush leading blanks
+TxtNa2:!PROD(	<LETTER!DIGIT>		,NAAC,*,TxtNa2)	; Each char in name
+	PROD(	"-"			,NAAC,*,TxtNa2)	; "-" OK in name too
+	PROD(	<SG>			,RET , ,      )	; done with name
+
+;TxtNum scans a number, saving the old one.
+TxtNum:!PROD(	<SG>			,NUIN, ,TxtNu1)	; Init num
+TxtNu1:!PROD(	<DIGIT>			,NUAC,*,TxtNu1)	; Each digit in num
+	PROD(	<SG>			,RET , ,      )	; done with number
+
+	tblend
+
+	xall	; resume normal listing
+; Routines to use in parsing HOSTS.TXT and HOSTS.ADD.
+NoHost==666666		; Address of no host yet.
+
+A.NHST:	setzm	NamBuf		; Clear out name storage and things.
+	move	t2,[xwd NamBuf,NamBuf+1]
+	blt	t2,NamBuf+BufWds-1
+	setzm	NamCnt
+	setzm	NamPtr
+	movei	t3,NoHost	; Clear T3 also (used for our host storage)
+	popj	p,
+
+A.EHST:	move	t1,NamPtr	; Store new host data!  Get name ptr.
+	ibp	t1		; Find out how much space name takes.
+	subi	t1,NamBuf-1	; Need length of ASCIZ name, +1.
+	movei	t1,1(t1)	; One word for length entry,
+	movei	t2,$htNLn(t1)	;  plus <n> words for rest of host entry.
+	pushj	p,AddWds	; Allocate this many words.
+	  pjrst	A.RET##		; No go!  Give up; nonskip LEXINT return.
+	movem	t2,$htLen(t3)	; Store length of entry,
+	camle	t2,LowMax	; Keep this at the maximum size.
+	  movem	t2,LowMax
+	movem	t1,$htNLn(t3)	;  and length of primary name in ASCIZ.
+	move	t2,NumAcc	; Range-check IMP number.
+	cail	t2,Ih.Imp
+	  pjrst	A.RET##		;  nonskip from LEXINT if bogus
+	move	t2,OldNum	; First number scanned is host-within-IMP
+	cail	t2,<Ih.Hst_<-^D16>>
+	  pjrst	A.RET##		;  propagate failure on bogosity
+	lsh	t2,^D16		;  which gets moved over 16 bits,
+	add	t2,NumAcc	;   and added to IMP number.
+	movem	t2,$htNum(t3)	; Host number stored here
+	setzm	$htAtr(t3)	; No attributes yet.
+	movsi	t2,NamBuf	; Transfer name text to structure
+	hrri	t2,$htTxt(t3)	; NamBuf to $htTxt
+	addi	t1,$htTxt-2(t3)	;  last address to transfer
+	blt	t2,(t1)		; Store it!
+	popj	p,		; That's all, folks.
+
+AddWds:	move	t3,.JbFF##	; Alloc (T2) words from .JBFF, ptr in T3.
+AddWdX:	move	t4,t2		; Copy argument to real temp
+	addb	t4,.JbFF##	; Bump free-pointer, copy.
+	movei	t4,-1(t4)	; firstFree -> lastUsed
+	camg	t4,.JbRel##	; Can we address it?
+	  jrst	CPopj1##	;  Yes; skip return.
+	Core	t4,		; No; ask for it.
+	  popj	p,		; No go!  Grumble.
+	jrst	CPopj1##	; 's OK.
+
+; A.StsP and A.NckP want to conditionally skip, testing whether the string
+;   we just scanned was a particular constant.  Unfortunately, LEXINT isn't
+;   geared to doing this, so we fake being a CALL/RET or CALL/SRET pair.
+;   This is indeed hideous, I know.  Well, phooey on LEXINT!
+A.StsP:	skipa	t1,[[asciz/STATUS/]]	; check for "STATUS"
+A.NckP:	  movei	t1,[asciz/NICKNAMES/]	; check for "NICKNAMES"
+	jrst	A.xxxP		;  jump to common code
+A.MaiP:	skipa	t1,[[asciz/MAIL/]]	; check for "MAIL"
+A.SrvP:	  movei	t1,[asciz/SERVERS/]	; check for "SERVERS"
+A.xxxP:	movem	p1,(p)		;[HACK] Fake A.CALL!!
+	push	p,p1		;[HACK] more A.CALL fake
+	movei	t2,NamBuf	; Is the string same as our argument?
+	pushj	p,UpEq##	; Convert case just to be defensive.
+	  pjrst	A.RET##		;[HACK] Fake a nonskip return
+	pjrst	A.SRET##	;[HACK] Fake a skip return.
+
+A.StsS:			; Decipher and store status argument.
+	cain	t3,NoHost	; Do we even have a host block?
+	  popj	p,		;  no.  Ignore the results.
+	pushj	p,Save1##	; Grab a register.
+	movsi	p1,-StsLen	; number of kinds of status
+AStss1:	movei	t1,NamBuf	; Check for various values of STATUS attr.
+	move	t2,StsKnd(p1)	; Is it this kind?
+	pushj	p,UpEq##
+	  jrst	AStss2
+	movei	t1,St$Srv(p1)	; We assume contiguity of values.
+	dpb	t1,[point 2,$htAtr(t3),35]	; Low-order two bits.
+	popj	p,
+AStss2:	aobjn	p1,AStss1	; Try next kind.
+	popj	p,		; not in the table.  return empty.
+StsKnd:	[asciz/SERVER/]		; Table of string addresses; must be in the
+	[asciz/USER/]		;  same order as status values.
+	[asciz/TIP/]
+StsLen==.-StsKnd
+
+A.MaiS:			; Decipher and store mail-kind argument.
+	cain	t3,NoHost	; Do we even have a host block?
+	  popj	p,		;  no.  Ignore the results.
+	pushj	p,Save1##	; Grab a register.
+	movsi	p1,-MaiLen	; number of kinds of mail attributes
+AMais1:	movei	t1,NamBuf	; Check for various values of Mail attr.
+	move	t2,MaiKnd(p1)	; Is it this kind?
+	pushj	p,UpEq##
+	  jrst	AMais2
+	move	t1,MaiBit(p1)	; Get the relevant attribute.
+	iorm	t1,$htAtr(t3)	;  and save it.
+	popj	p,
+AMais2:	aobjn	p1,AMais1	; Try next kind.
+	popj	p,		; Don't be too critical.
+MaiKnd:	[asciz/USER/]		; Table of string addresses; must be in the
+	[asciz/MAIL/]		;  same order as status values.
+MaiLen==.-MaiKnd
+MaiBit:	ht$Mlt			; Multics ("USER NETML" and "PASS NETML")
+	ht$Mai			; Use (FTP) MAIL; (FTP) MLFL doesn't work.
+
+A.SrvS:			; Decipher and store server-kind argument.
+	cain	t3,NoHost	; Do we even have a host block?
+	  popj	p,		;  no.  Ignore the results.
+	pushj	p,Save1##	; Grab a register.
+	movsi	p1,-SrvLen	; number of kinds of servers
+ASrvs1:	movei	t1,NamBuf	; Check for various values of servers
+	move	t2,SrvKnd(p1)	; Is it this kind?
+	pushj	p,UpEq##
+	  jrst	ASrvs2
+	move	t1,SrvBit(p1)	; Get the relevant attribute.
+	iorm	t1,$htAtr(t3)	;  and save it.
+	popj	p,
+ASrvs2:	aobjn	p1,ASrvs1	; Try next kind.
+	popj	p,		; Don't be too critical.
+SrvKnd:	[asciz/FINGER/]		; Table of string addresses; must be in the
+				;  same order as status values.
+SrvLen==.-SrvKnd
+SrvBit:	ht$Fng			; Host has Finger server.
+
+A.NckS:			; Store a nickname at end of buffer.
+	move	t2,NamPtr	; Get string pointer,
+	ibp	t2		;  allocate space for trailing null.
+	subi	t2,NamBuf-1	; Stupid MACRO doesn't allow `2-NamBuf'
+	movei	t2,1(t2)	; Get how much addl space.
+	move	t1,.JbFF##	; Remember pointer; AddWdX doesn't.
+	pushj	p,AddWdX
+	  pjrst	A.RET##		; Bogus!
+ANckS1:	movei	t4,(t2)		; Make a copy of size
+	addb	t4,$htLen(t3)	;  so we get a copy of $htLen, too.
+	camle	t4,LowMax	; Now keep LowMax set at maximum entry size.
+	  movem	t4,LowMax
+	movem	t2,$NmLen(t1)	; Length of nickname text and count.
+	movsi	t4,NamBuf	; Transfer from NamBuf
+	hrri	t4,$NmTxt(t1)	;  to $NmTxt(t1), ending
+	addi	t2,$NmTxt-2(t1)	;   at $NmTxt(t1) minus cntwrdlen minus one.
+	blt	t4,(t2)		; Move it!
+	popj	p,		;  that's all.
+
+A.NckA:			; Store a nickname in the middle of the buffer.
+	cain	t3,NoHost	; Have we a host yet?
+	  popj	p,		;  no; bypass this.
+	pushj	p,Save3##	; Need a few regs for backwards-BLT.
+	move	t2,NamPtr	; Get string pointer,
+	ibp	t2		;  allocate space for trailing null.
+	subi	t2,NamBuf-1	; Stupid MACRO doesn't allow `2-NamBuf'
+	movei	t2,1(t2)	; Get how much addl space.
+	move	t1,.JbFF##	; Remember pointer; AddWdX doesn't.
+	pushj	p,AddWdX
+	  popj	p,		; Bogus!  But we just punt this nickname.
+	subi	t1,(t3)		; How many words to move,
+	sub	t1,$htLen(t3)	;  following host entry.
+	hrrz	t4,.JbFF##	; Set up fake PDL pointer in T4: RH gets
+	subi	t4,1(t2)	;  first source addr.
+	hrli	t4,-1		; Allow many "pop t4," instructions.
+	movsi	p1,(<pop t4,(t4)>)	; p1/ pop t4,(t4)
+	hrri	p1,(t2)		; p1/ pop t4,<t2>(t4)
+	move	p2,[sojge t1,p1]; p2/ sojge t1,p1
+	movsi	p3,(<popj p,>)	; p3/ return instruction.
+	pushj	p,p2		; Call backwards-BLT routine.
+	movei	t1,(t3)		; Get address that's now freed for us.
+	add	t1,$htLen(t3)	;  (it was the first one past the end)
+	jrst	ANckS1		; Back to A.NckS to finish up.
+
+A.FHst:			; Find a host from the table, so we can change it.
+	pushj	p,Save2##	; Get a couple extra registers.
+	move	p1,HstBas	; Base of host buffer
+AFHst3:	movei	p2,$htNLn(p1)	; Base of the first name
+	move	t3,$htLen(p1)	; length of the entire entry
+	subi	t3,$htNLn-1+1	;  minus the length of the non-name parts.
+AFHst2:	movei	t1,NamBuf	; See if this is our name.
+	movei	t2,$NmTxt(p2)	;  compare scan-rslt with name in buffer.
+	pushj	p,UpEq##	;   (ignore case differences)
+	  jrst	AFHst1		; nope, keep scanning.
+	movei	t3,(p1)		; Yes!  Excellent; stop while we're ahead.
+	movsi	t2,NamBuf	; Transfer this-case version of name
+	hrri	t2,$NmTxt(p2)	;  to table being built.
+	move	t1,$NmLen(p2)	; Compute end of transfer
+	addi	t1,$NmTxt-1-1(p2)
+	blt	t2,(t1)		; Do the deed.
+	popj	p,		;  (remember host ptr in T3)
+AFHst1:	sub	t3,$NmLen(p2)	; account for length we've looked at;
+	add	p2,$NmLen(p2)	; Scan past name.
+	jumpg	t3,AFHst2	; If more to this host, look at nicknames.
+	add	p1,$htLen(p1)	; Skip on to next host.
+	skipe	(p1)		; end of buffer marked by a zero
+	  jrst	AFHst3		; not there yet.  Keep going.
+	movei	t3,NoHost	; No, that was all.  Just ignore this entry.
+	popj	p,
+
+A.NaIn:	setzm	NamBuf		; Init for name reading.
+	move	t1,[xwd NamBuf,NamBuf+1]
+	blt	t1,NamBuf+BufWds-1
+	movei	t1,<BufWds*5>-1	; count char spaces available
+	movem	t1,NamCnt
+	move	t1,[point 7,NamBuf]	; Init pointer.
+	movem	t1,NamPtr
+	popj	p,
+A.NaAc:	sosl	NamCnt		; Store character if there's room.
+	  idpb	p2,NamPtr
+	popj	p,
+
+A.NuIn:	movei	t1,0		; Start reading a number, saving one back.
+	exch	t1,NumAcc
+	movem	t1,OldNum
+	popj	p,
+A.NuAc:	move	t1,NumAcc	; Get next digit of number.
+	imuli	t1,^D10
+	addi	t1,-"0"(p2)
+	movem	t1,NumAcc
+	popj	p,
+	subttl	Productions to parse HOSTS.ADD
+	; Freely lifted from Taft version, CFE
+
+	sall	; flush ascii expansion
+
+	tblbeg	AddRd
+
+AddRd0:!PROD(	<BLANK!BREAK>		,    ,*,AddRd0) ; Ignore blanks
+	PROD(	-SEMI			,NHST, ,AddRd2) ; Comment?
+AddRd1:!PROD(	-<BREAK>		,    ,*,AddRd1) ;  Yes; ignore line
+	PROD(	<SG>			,    , ,AddRd0) ; EOL: next line.
+AddRd2:!PROD(	<SG>			,CALL, ,AddNam) ; Get a name string.
+	PROD(	-<BREAK>		,RET , ,      )	;  err if not EOL.
+	PROD(	<SG>			,FHST,*,      )	; Call A.FHST to setup
+; Here to scan attribute lines, while they hold out.
+AddRd3:!PROD(	<BREAK>			,    ,*,AddRd0)	; Blankline -> top.
+	PROD(	<SG>			,CALL, ,AddNam)	; Get name of attr.
+	PROD(	-"="			,RET , ,      )	;  must have "=" now
+	PROD(	<SG>			,STSP,*,      )	; Was it "STATUS="?
+	  PROD(	<SG>			,    , ,AddRd4)	;  no, keep looking
+; Here when attribute was "STATUS=" -- see what keyword was.
+	PROD(	<SG>			,CALL, ,AddNam)	; Get the keyword
+	PROD(	-<BREAK>		,RET , ,      )	;  err if not EOL
+	PROD(	<SG>			,STSS,*,AddRd3)	; Store sts and AddRd3
+; Attr wasn't "STATUS=" -- keep looking.
+AddRd4:!PROD(	<SG>			,NCKP, ,      )	; Is it "NICKNAMES="?
+	  PROD(	<SG>			,    , ,AddRd6)	;  No; keep looking.
+; Here when attribute was nickname-list.  Keep scanning them.
+AddRd5:!PROD(	<SG>			,CALL, ,AddNam)	; Get a name.
+	PROD(	<SG>			,NCKA, ,      )	;  add a nickname.
+	PROD(	comma			,    ,*,AddRd5)	; Back for more on ","
+	PROD(	<BLANK>			,    ,*,AddRd5)	;  or blank:
+	PROD(	-<BREAK>		,RET , ,      )	; Must be that or brk
+	PROD(	<SG>			,    ,*,AddRd3)	; More attrs!
+; Attr wasn't "NICKNAMES=" -- keep looking.
+AddRd6:!PROD(	<SG>			,MAIP, ,      )	; Is it "MAIL="?
+	  PROD(	<SG>			,    , ,AddRd8)	;  No; keep looking.
+; Here when attribute was mailAttribute-list.  Keep scanning them.
+AddRd7:!PROD(	<SG>			,CALL, ,AddNam)	; Get a name.
+	PROD(	<SG>			,MAIS, ,      )	;  store it as nickn.
+	PROD(	comma			,    ,*,AddRd7)	; Back for more on ","
+	PROD(	<BLANK>			,    ,*,AddRd7)	;  or blank:
+	PROD(	-<BREAK>		,RET , ,      )	; Must be that or brk
+	PROD(	<SG>			,    ,*,AddRd3)	; More attrs!
+; Attr wasn't "MAIL=" -- keep looking.
+AddRd8:!PROD(	<SG>			,SRVP, ,      )	; Is it "SERVERS="?
+	  PROD(	<SG>			,    , ,AddRd1)	;  No; discard line!
+; Here when attribute was server-list.  Keep scanning them.
+AddRd9:!PROD(	<SG>			,CALL, ,AddNam)	; Get a name.
+	PROD(	<SG>			,SRVS, ,      )	;  store server name
+	PROD(	comma			,    ,*,AddRd9)	; Back for more on ","
+	PROD(	<BLANK>			,    ,*,AddRd9)	;  or blank:
+	PROD(	-<BREAK>		,RET , ,      )	; Must be that or brk
+	PROD(	<SG>			,    ,*,AddRd3)	; More attrs!
+
+; AddNam scans a host identifier string.
+AddNam:!PROD(	<SG>			,NAIN, ,AddNa1)	; Init name
+AddNa1:!PROD(	<BLANK>			,    ,*,AddNa1)	; Flush leading blanks
+AddNa2:!PROD(	<LETTER!DIGIT>		,NAAC,*,AddNa2)	; Each char in name
+	PROD(	"-"			,NAAC,*,AddNa2)	; "-" OK in name too
+	PROD(	<SG>			,RET , ,      )	; done with name
+
+;AddNum scans a number, saving the old one.
+AddNum:!PROD(	<SG>			,NUIN, ,AddNu1)	; Init num
+AddNu1:!PROD(	<DIGIT>			,NUAC,*,AddNu1)	; Each digit in num
+	PROD(	<SG>			,RET , ,      )	; done with number
+
+	tblend
+
+	xall	; normal listing again
+	subttl	Storage for this module
+
+; File block for HOSTS.TXT input, from original Taft source
+FilHst:	file	Hst,I,HstFil,<dev(SYS),name(HOSTS),ext(TXT)
+		,open(HstErX),lookup(HstErX),input(CPopj##),eof(CPopj1##)
+		,<inst(<pushj p,HsFRed>)>>
+
+; File block for HOSTS.ADD input
+FilAst:	file	Hst,I,HstFil,<dev(SYS),name(HOSTS),ext(ADD)
+		,open(HstErX),lookup(AddNF),input(CPopj##),eof(CPopj1##)
+		,<inst(<pushj p,HsFRed>)>>
+
+; File block for HOSTS.ADD input, when called from HstBld
+FilAsz:	file	Hst,I,HstFil,<dev(SYS),name(HOSTS),ext(ADD)
+		,open(HstErZ),lookup(AddNFx),input(CPopj##),eof(CPopj1##)
+		,<inst(<pushj p,HsFRed>)>>
+
+HsFRed:	pushj	p,I1Byte##	; Input a byte in the normal manner  [Taft]
+	caie	u1,CR		; but ignore carriage returns	     [Taft]
+	jumpn	u1,CPopj##	;  and nulls			     [Taft]
+	jrst	HsFRed		;				     [Taft]
+
+; Shared (high-segment) cells:
+ShrPtr::exp	0		; Pointer to beginning of Arpanet host table
+ShrChk::exp	-^D1000000	; UDT timestamp of last file-date check
+ShrHTS::exp	-^D34567	; HOSTS.TXT timestamp, init invalid
+ShrATS::exp	-^D45678	; HOSTS.ADD timestamp, init invalid
+ShrMax::exp	-1		; Max entry size; init to invalid.
+
+	reloc	0	; Down to low segment
+; Private storage here:
+LowHTS::block	1		; Private HOSTS.TXT timestamp
+LowATS::block	1		; Private HOSTS.ADD timestamp
+LowMax::block	1		; Private max entry size.
+
+HstFil::block	FBSize		; TULIP open-file block
+
+HstBas:	block	1		; Base address of low-seg table being built.
+NumAcc:	block	1		; Save number being scanned.
+OldNum:	block	1		;  also previous number; it's cheap.
+NamCnt:	block	1		; Count of free cells in NamBuf.
+NamPtr:	block	1		; Byte pointer to NamPtr
+NamBuf:	block	BufWds		; Temporary name storage.
+	reloc
+
+	prgend
+	Title	HstStr -- String-handling routines for IMPSUB.
+	subttl	C.F.Everhart -- 19 May 1980
+
+	entry	UpEq, UlIni
+
+	TwoSegments
+	reloc	400000
+	search	MacTen, UUOSym, HstTbl, Tulip
+
+; Routine to compare two ASCIZ strings for equality, ignoring case
+;   distinctions.  Call:
+;	movei	t1,string-adr-1
+;	movei	t2,string-adr-2
+;	pushj	p,UpEq##
+;	  +1 return: strings unequal
+;	  +2 return: strings equal
+; Clobbers t1, t2, t4.  T3 preserved.
+
+UpEq::	pushj	p,Save1##	; need another register
+	hrli	t1,(<point 7,0>)	; Make 'em byte pointers
+	hrli	t2,(<point 7,0>)
+UpEq1:	ildb	t4,t1		; Next char from string
+	ildb	p1,t2
+	jumpn	t4,UpEq2
+	jumpe	p1,CPopj1##	; End of string for both.  Good.
+	popj	p,		; one ended early.
+UpEq2:	jumpe	p1,CPopj##	; the other ended early.
+	xori	t4,(p1)		; Compare the characters.
+	jumpe	t4,UpEq1	; Jump if they were the same
+	trne	t4,137		; Same in all but case?
+	  popj	p,		;  no, some other difference.
+	andcmi	p1,40		; See if it's a letter.
+	cail	p1,"A"
+	 caile	p1,"Z"
+	  popj	p,		; Wasn't a letter; no dice.
+	jrst	UpEq1		; Was UC/lc letter pair.  OK.
+
+; Routine to check whether the ASCIZ string pointed to by T1 is an initial
+;   string of that pointed to by T2, ignoring case distinctions.
+; Call:
+;	movei	t1,adr-of-shorter-string
+;	movei	t2,adr-of-longer-string
+;	pushj	p,UlIni##
+;	  +1 return: (t1) is not an initial substring of (t2)
+;	  +2 return: (t1) is an initial substring of (t2)
+; Clobbers t1, t2, t4.  T3 preserved.
+
+UlIni::	pushj	p,Save1##	; need another register
+	hrli	t1,(<point 7,0>)	; Make 'em byte pointers
+	hrli	t2,(<point 7,0>)
+UlIni1:	ildb	t4,t1		; Next char from string
+	jumpe	t4,CPopj1##	; End of first means success.
+	ildb	p1,t2
+	jumpe	p1,CPopj##	; End of second and not first means failure.
+	xori	t4,(p1)		; Compare the characters.
+	jumpe	t4,UlIni1	; Jump if they were the same
+	trne	t4,137		; Same in all but case?
+	  popj	p,		;  no, some other difference.
+	andcmi	p1,40		; See if it's a letter.
+	cail	p1,"A"
+	 caile	p1,"Z"
+	  popj	p,		; Wasn't a letter; no dice.
+	jrst	UlIni1		; Was UC/lc letter pair.  OK.
+
+prgend
+	TITLE	ICPGET -- ROUTINE TO PERFORM ICP'S	
+	SUBTTL	E.A.TAFT/EAT/EW13/CFE --	JAN. 75
+
+; Change log:
+;  8 Jul 80	C.F.Everhart: convert to using *only* new-format
+;		IMPUUO blocks.
+
+	ENTRY	ICPGET
+
+	OPDEF	MCALL	[CALL]		;RETAIN DEC DEFINITION OF 'CALL'
+
+	TWOSEG
+	RELOC	400000
+	SEARCH	MACTEN,UUOSYM,TULIP,IMP
+
+;OTHER DEFINITIONS
+	ICP==	0	;I/O CHANNEL FOR DOING ICP
+
+DEFINE IMPUUO(AC,JUNK) <
+	MCALL	AC,[SIXBIT\IMPUUO\]
+>
+	SALL
+
+
+;ROUTINE TO PERFORM AN ICP CONNECTION.
+;	MOVE	T1,[DESIRED FOREIGN ICP SOCKET (ODD)]
+;	MOVE	T2,[ADDRESS OF TELNET CONNECTION BLOCK]
+;	PUSHJ	P,ICPGET
+;	  ERROR--MESSAGE ALREADY PRINTED, NO CONNECTIONS OPEN
+;	NORMAL RETURN--TELNET CONNECTION OPEN
+;  THE TELNET CONNECTION BLOCK MUST HAVE THE DEVICE, LOCAL SOCKET,
+;  BYTE SIZE, AND HOST FIELDS SETUP AND THE REMAINING FIELDS ZERO.
+;  The connection block must be in the new format (six words).
+;  THE LOCAL SOCKET MUST BE EVEN AND .GE. 2.  THE CONNECTION
+;  BLOCK IS RETURNED WITH THE ACTUAL IMP DEVICE NAME AND REMOTE
+;  SOCKET (FOR THE RECEIVE CONNECTION) STORED IN IT.
+;  THE LH OF T2 MAY CONTAIN IMPUUO FLAGS OR A NONSTANDARD TIMEOUT
+;  TO BE USED ON BOTH THE ICP AND TELNET CONNECTIONS.
+ICPGET::MOVEM	T1,.IBRMT+ICPBLK ;STORE DESIRED FOREIGN ICP SOCKET
+	MOVSI	T1,'ICP'	;SETUP DEVICE NAME FOR ICP
+	MOVEM	T1,.IBDEV+ICPBLK
+	MOVE	T1,.IBLCL(T2)	;GET DESIRED INPUT TELNET SOCKET
+	SUBI	T1,2		;COMPUTE ICP SOCKET
+	MOVEM	T1,.IBLCL+ICPBLK ;STORE IN ICP CONNECTION BLOCK
+ifn 0,<
+	HRRZ	T1,.IBHST(T2)	;GET DESIRED REMOTE HOST
+	HRLI	T1,^D32		;SET ICP BYTE SIZE
+	MOVEM	T1,.IBHST+ICPBLK ;STORE IN ICP CONNECTION BLOCK
+>; ifn 0
+ifn 1,<
+	move	t1,.IbHst(t2)	;[CFE] Get desired remote host;
+	movem	t1,.IbHst+ICPBlk ;[CFE]  and store in ICP conn. block.
+	movsi	t1,^D32		;[CFE] Also ICP byte size
+	movem	t1,.IbByt+ICPBlk ;[CFE]  store it, too.
+>; ifn 1
+	MOVE	T1,T2		;GET TELNET CONNECTION BLOCK
+ifn 0,<
+	TLO	T1,.IULSN	;SETUP LISTEN OPERATION
+>; ifn 0
+ifn 1,<
+	tlo	t1,.IuLsn(IF.New)	; Listen op, new format
+>; ifn 1
+	PUSHJ	P,IMPCAL##	;LISTEN ON TELNET INPUT SOCKET
+	  POPJ	P,		;ERROR, PUNT NOW
+	AOS	.IBLCL(T2)	;NOW SWITCH TO OUTPUT SOCKET
+	PUSHJ	P,IMPCAL##	;LISTEN ON TELNET OUTPUT SOCKET
+	  JRST	ICPER9		;ERROR, GO CLEAN UP AND PUNT
+	HLLZ	T1,T2		;OK, FETCH FLAGS AND TIMEOUT
+ifn 0,<
+	IOR	T1,[.IUCON,,ICPBLK] ;CONSTRUCT CONNECT FUNCTION
+>; ifn 0
+ifn 1,<
+	IOR	T1,[IF.New+ICPBLK(.IUCon)] ;CONSTRUCT CONNECT FUNCTION
+>; ifn 1
+	PUSHJ	P,IMPCAL##	;CONNECT THE ICP SOCKET
+	  JRST	ICPER8		;ERROR, GO CLEAN UP
+	FSETUP	FILICP		;OK, SETUP ICP FILE BLOCK
+	FIOPEN	ICPFIL		;OPEN IT FOR INPUT
+	MOVSI	T3,(POINT 32)	;CHANGE BYTE SIZE FOR ICP INPUT
+	HLLM	T3,ICPFIL+FILPTR
+	RCH	.IBRMT(T2)	;READ THE DESIRED FOREIGN SOCKET NUMBER
+	FICLOS	ICPFIL		;CLEAR THE CHANNEL
+ifn 0,<
+	HRLI	T1,.IUCLS(IF.NWT) ;CLOSE ICP CONNECTION WITHOUT WAITING
+>; ifn 0
+ifn 1,<
+	HRLI	T1,.IUCLS(IF.NWT!IF.New) ;CLOSE ICP CONNECTION WITHOUT WAITING
+>; ifn 1
+	PUSHJ	P,IMPCAL##
+	  JFCL			;IGNORE ERRORS THIS TIME
+	MOVE	T1,T2		;GET TELNET CONNECTION BLOCK POINTER
+ifn 0,<
+	TLO	T1,.IUCON	;SETUP CONNECT FUNCTION
+>; ifn 0
+ifn 1,<
+	tlo	t1,.IUCon(IF.New) ; Set to connect, new fmt
+>; ifn 1
+	PUSHJ	P,IMPCAL##	;CONNECT SEND SOCKET (U+3 TO S)
+	  JRST	ICPER8		;ERROR, GO CLEAN UP
+	SOS	.IBLCL(T2)	;NOW SWITCH SIDES
+	AOS	.IBRMT(T2)
+	PUSHJ	P,IMPCAL##	;CONNECT RECEIVE SOCKET (U+2 TO S+1)
+	  AOSA	.IBLCL(T2)	;ERROR, RESET TO SEND SOCKET
+	JRST	CPOPJ1##	;SUCCESS, TAKE SKIP RETURN FROM ICPGET
+	JRST	ICPER9		;ON ERROR, CLEAN UP FIRST
+;HERE TO CLEAN UP AFTER VARIOUS SORTS OF ERRORS BEFORE TAKING THE
+;  ERROR RETURN
+
+ICPER6:	ERRIOP	ICPFIL		;HERE WHEN CAN'T OPEN THE ICP FILE
+	JRST	ICPER8
+
+ICPER7:	ERRIN	ICPFIL		;HERE WHEN GOT AN INPUT ERROR ON ICP
+	RELEAS	ICP,		;CLEAR THE CHANNEL
+
+ICPER8:	PUSHJ	P,ICPERC	;HERE TO CLOSE ICP AND TELNET SOCKETS
+
+ICPER9:	MOVEI	T1,(T2)		;HERE TO CLOSE THE TELNET SOCKETS
+	PUSHJ	P,ICPERC	;DO OUTPUT SIDE
+	SOS	.IBLCL(T1)	;NOW INPUT
+
+ICPERC:
+ifn 0,<
+	HRLI	T1,.IUCLS(IF.NWT) ;NO WAIT ON CLOSE OF SOCKET
+>; ifn 0
+ifn 1,<
+	hrli	t1,.IUCls(IF.NWt!IF.New) ; No wait on close, new fmt
+>; ifn 1
+	IMPUUO	T1,		;CLOSE THE SOCKET
+	  IMPUUO T1,		;TRY AGAIN IF IT FAILS
+	    POPJ P,		;IGNORE ANY ERRORS
+	POPJ	P,
+
+
+;ICP FILE BLOCK
+FILICP:	FILE	ICP,I,ICPFIL,<DEV(ICP),NAME(ICP),EXT(ICP),STAT(6)
+		,OPEN(ICPER6),INPUT(ICPER7),EOF(ICPER7)>
+
+
+	RELOC	0		;LOW SEGMENT STUFF
+
+ICPBLK:	BLOCK	.IBSIZ		;ICP CONNECTION BLOCK
+ICPFIL:	BLOCK	FBSIZE		;ICP INPUT FILE BLOCK
+
+	RELOC
+	PRGEND
+	TITLE	IMPCAL -- IMPUUO CALL AND ERROR HANDLER
+	SUBTTL	E.A.TAFT/EAT/EW13 --	JAN. 75
+
+	ENTRY	IMPCAL,IMPERR
+
+	OPDEF	MCALL	[CALL]		;RETAIN DEC DEFINITION OF 'CALL'
+
+	TWOSEG
+	RELOC	400000
+	SEARCH	MACTEN,UUOSYM,TULIP,IMP
+
+	SALL
+
+
+;ROUTINE TO PERFORM AN IMPUUO OPERATION, WITH ERROR MESSAGES PRINTED
+;  AUTOMATICALLY.
+;	MOVE	T1,[IMPUUO ARGUMENT WORD]
+;	PUSHJ	P,IMPCAL
+;	  ERROR--MESSAGE ALREADY PRINTED
+;	NORMAL RETURN
+;  NO AC'S ARE CLOBBERED ON EITHER RETURN, EXCEPT THAT IF THE RH OF
+;  T1 WAS ZERO IT IS SET TO POINT TO A DUMMY CONNECTION BLOCK.
+
+IMPCAL::TRNN	T1,-1		;CONNECTION BLOCK SUPPLIED?
+	HRRI	T1,DMYCON	;NO, USE DUMMY CONNECTION BLOCK
+	MCALL	T1,[SIXBIT\IMPUUO\] ;PERFORM THE IMPUUO OPERATION
+	  PJRST	IMPERR		;ERROR, GO PRINT MESSAGE
+	JRST	CPOPJ1##	;NORMAL RETURN
+;ROUTINE TO PRINT AN IMP ERROR MESSAGE ONTO THE FILE POINTED TO BY
+;  EFILE.
+;	MOVE	T1,[IMPUUO ARGUMENT WORD]
+;	PUSHJ	P,IMPERR
+;	ALWAYS RETURN HERE, NO AC'S CLOBBERED
+;  THE RH OF T1 MUST POINT TO THE CONNECTION BLOCK THAT WAS USED WHEN
+;  THE IMPUUO OPERATION FAILED.
+
+IMPERR::PUSHJ	P,SAVE3##	;GET SOME AC'S
+	LDB	P1,[POINTR (T1,IF.FNC)] ;GET IMPUUO FUNCTION CODE
+	MOVSI	P2,-NIMFNC	;NUMBER OF KNOWN IMP FUNCTIONS
+	LDB	P3,[POINT 7,IMPETB(P2),17] ;GET FUNCTION CODE FROM TABLE
+	CAIE	P3,(P1)		;IS THIS THE ONE?
+	AOBJN	P2,.-2		;NO, TRY NEXT
+	MOVE	P1,IMPETB(P2)	;GET WHOLE TABLE ENTRY
+	MOVE	P2,.IBDEV(T1)	;GET IMP DEVICE NAME
+	TLNE	P1,(IE.NEO)	;EXTENDED STATUS?
+	MOVE	P2,.XSDEV(T1)	;YES, GET FROM DIFFERENT PLACE
+	TLNE	P1,(IE.NDN)	;WANT TO PRINT DEVICE NAME?
+	MOVSI	P2,'IMP'	;NO, JUST SAY 'IMP'
+	HRRZ	P3,.IBSTT(T1)	;GET ERROR CODE
+	TLNE	P1,(IE.NEO)	;IF EXTENDED STATUS,
+	HRRZ	P3,.XSIST(T1)	;  GET FROM DIFFERENT PLACE
+	CAIL	P3,NIMEMS-1	;CODE WITHIN TABLES?
+	MOVEI	P3,NIMEMS-1	;NO, SAY 'UNKNOWN'
+	TLNE	P1,(IE.AFI)	;CAN FUNCTION ASSIGN A FREE IMP DEV?
+	CAIE	P3,.IENSD	;YES, IS IT 'NO SUCH DEVICE'?
+	JRST	.+3		;NO, CONTINUE
+	MOVEI	P3,[SIXBIT\&NO &IMP&S AVAILABLE!\] ;YES, ALTERNATE MSG
+	JRST	IMPER5
+	ROT	P3,-1		;DIVIDE BY 2 FOR HALFWORD TABLE
+	JUMPGE	P3,.+2
+	SKIPA	P3,IMPEMS(P3)	;RIGHT HALF (ODD) ENTRY
+	MOVS	P3,IMPEMS(P3)	;LEFT HALF (EVEN) ENTRY
+IMPER5:	EDISIX	[CPOPJ##,,[SIXBIT\? % % &ERROR - %#!\]
+		WNAME	P2	;PRINT IMP DEVICE NAME IF ANY
+		WSIX	(P1)	;PRINT FUNCTION
+		WSIX	(P3)]	;PRINT ERROR MESSAGE
+;IMPUUO FUNCTION TABLE
+
+DEFINE E(COD,FLAGS,MSG) <
+	ZZ==	0
+IFNB <FLAGS>,<IRP FLAGS <ZZ==ZZ+IE.'FLAGS>>
+	EXP	ZZ + <.IU'COD>B17 + [SIXBIT\MSG!\]
+>
+
+	IE.NDN==1B0		;NO DEVICE NAME TO BE PRINTED
+	IE.NEO==1B1		;NONSTANDARD ERROR OFFSET IN BLOCK
+	IE.AFI==1B2		;FUNCTION CAN ASSIGN FREE IMP DEVICES
+
+IMPETB:	E STT,		,S&TATUS
+	E CON,<AFI>	,C&ONNECTION
+	E CLS,		,C&LOSE
+	E LSN,<AFI>	,L&ISTEN
+	E REQ,<AFI>	,R&EQUEST
+	E XTT,		,C&ROSSPATCH
+	E XNT,		,I&NTERRUPT
+	E ANT,		,I&NTERRUPT VECTOR
+	E VRS,<NDN>	,V&ERSION
+	E DEA,		,D&EASSIGN
+	E LHS,<NDN>	,L&OCAL HOST PARAMETER
+	E GVB,		,G&IVE-BACK
+	E ITY,		,TTY &TRANSLATION
+	E XWT,		,C&ROSSPATCH WAIT
+	E PES,<NDN>	,E&SCAPE CHARACTER SET
+	E RES,<NDN>	,E&SCAPE CHARACTER READ
+	E PCP,		,C&ONNECTION PARAMETER SET
+	E RCP,		,C&ONNECTION PARAMETER READ
+	E XIS,<NEO>	,E&XTENDED STATUS
+	E TRC,		,T&RACE
+	E NOP,<NDN>	,N&O-OP
+	E RST,<NDN>	,R&ESET
+	E ALL,		,A&LLOCATE
+	E ECO,<NDN>	,E&CHO
+	E INI,<NDN>	,S&YSTEM INITIALIZATION
+	E DWN,<NDN>	,S&YSTEM DOWN
+	E UP ,<NDN>	,S&YSTEM UP
+
+	NIMFNC==.-IMPETB	;NUMBER OF KNOWN FUNCTIONS
+
+	E STT,		,U&NKNOWN &IMPUUO
+;IMP ERROR MESSAGE TABLE
+
+DEFINE E(MSG) <
+	NIMEMS==NIMEMS+1
+IFE NIMEMS&1,<ZZ==[SIXBIT\MSG!\]>
+IFN NIMEMS&1,<
+	ZZ  ,,	[SIXBIT\MSG!\]
+>>
+	NIMEMS==-1
+
+IMPEMS:	E	&ILLEGAL OPERATION
+	E	&NO SUCH DEVICE
+	E	&DEVICE NOT AVAILABLE
+	E	&DEVICE NOT AN &IMP
+	E	&IMPROPER STATE
+	E	&REFUSED
+	E	&SYSTEM FAILURE
+	E	&ABORTED INCOMING &RFC
+	E	&CONNECTION DOESN'T MATCH REQUEST
+	E	&SOCKET NUMBER IN USE
+	E	&ILLEGAL HOST NUMBER
+	E	&HOST DOWN
+	E	&ADDRESS CHECK
+	E	&TIMEOUT
+	E	&PARAMETER SPECIFICATION ERROR
+	E	TTY &NOT CONNECTED TO &IMP
+	E	&ILLEGAL OR INDISTINCT CHARACTER
+	E	&NOT PRIVILEGED
+	E	&not an &imp
+	E	&network is not up
+	E	&UNDEFINED
+	E	&UNDEFINED
+
+
+	RELOC	0		;LOW SEGMENT STUFF
+
+DMYCON:	BLOCK	.IBSIZ		;DUMMY CONNECTION BLOCK
+
+	RELOC
+	END

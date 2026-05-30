@@ -1,0 +1,33 @@
+!** command file to create ttycnf.mac for DN87 system **
+
+.RUN MONGEN
+*Prompt
+*TTY
+*mon:ttycnf.mac
+*1070
+*2	; dual cpu system
+*0	;DC10S on cpu0
+*0	;DC68S on cpu0
+*0	;dc76s on cpu0
+*0	;DC10S on cpu1
+*0	;DC68S on cpu1
+*0	;dc76s on cpu1
+*CTY
+* ;DATA SETS (All on SHELOB and GOLLUM now)
+*0-11 ;HDW TABS (on ARPAnet lines, same as ITYN in HDWCNF)
+*;No more HDW TABS
+*0-211	;REMOTE LINES (everyone's remote until they get initia run)
+* ; no more remote lines........
+*0-11	;LOCAL COPY LINES (on arpanet lines, same as ITYN in HDWCNF)
+* ;No more local copy lines
+* ;HALF DUPLEX
+* ;SLAVES
+*0-11 ;HDW FORM FEED ITYS (on ARPAnet lines, same as ITYN in HDWCNF)
+*;No more HDW FORM FEEDS
+*CTY;LINES WHICH RUN INITIA AT STARTUP
+*0-212	;Everybody
+*214	;INCLUDING CTY1
+* ;No more INITIAs
+*0-214,0 ;FILL CLASS (ARPANET lines have fill 0, same as ITYN in HDWCNF)
+* ;No more filler
+.mic return

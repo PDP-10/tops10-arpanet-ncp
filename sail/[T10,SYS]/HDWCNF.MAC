@@ -1,0 +1,441 @@
+SUBTTL HDWCNF - HARDWARE CONFIGURATION DEFINITION FILE OUTPUT BY MONGEN
+
+
+DEFINE XP(A,B),<A==:B>
+
+
+XP M.MON,52
+
+;;	DECsystem10(1070,1080,1090,1091,2020)[
+;;	1070 is a system with KI10 cpu's
+;;	1080 is a system with KL10 cpu's
+;;	1090 is a system with KL10 cpu's and internal channels
+;;	1091 is a system with a KL10 cpu, internal memory, and devices
+;;	 on the front end
+;;	2020 is a system with a KS10 cpu]: 1080
+XP M.KI10,0
+XP M.KL10,1
+XP M.KS10,0
+XP M.1070,0
+XP M.1080,1
+XP M.1090,0
+XP M.1091,0
+XP M.2020,0
+
+;;	Cpu's(1,1-4)[Total number of cpu's in the system]: 1
+XP M.CPU,1
+
+;;	System name[24 characters or less]: CMUCSA 9.0/DEC 7.01-VM
+DEFINE	SYSNAM
+<	ASCIZ	&CMUCSA 9.0/DEC 7.01-VM&>
+
+;;	ARPA Host name[14 characters or less]: CMU-CS-A
+DEFINE HSTNAM
+<	ASCIZ	&CMU-CS-A&>
+
+;;	Host number on IMP(1): 
+XP ARPA.H,1
+
+;;	IMP number(47): 14
+XP ARPA.I,16
+DEFINE	SYSDAT<
+ASCIZ &01-17-83&>
+XP M.MON,1
+XP M.DAY,21
+XP M.YEAR,123
+
+;;	CPU0 serial #(1-10000): 1080
+XP M.C0SN,2070
+XP M.C1SN,0
+XP M.C2SN,0
+XP M.C3SN,0
+XP M.C4SN,0
+XP M.C5SN,0
+XP M.RT0,0
+XP M.RT1,0
+XP M.RT2,0
+XP M.RT3,0
+XP M.RT4,0
+XP M.RT5,0
+XP M.RTX,0
+
+;;	Exclude monitor overhead from user run time(Y,N)[
+;;	Overhead is CPU time spent clock queue processing, command
+;;	decoding, swapping, and scheduling.
+;;	User run time always includes UUO execution and
+;;	unless EBOX/MBOX runtime accounting is selected
+;;	(KL10 systems only) includes IO interrupt service time.
+;;	On KI systems, each CPU must have a DK10]: y
+XP M.RTCO,1
+
+;;	EBOX/MBOX runtime accounting?(Y,N)[
+;;	If EBOX/MBOX runtime accounting is selected in a KL10
+;;	based system, user runtime is computed using the KL10
+;;	internal accounting clocks]: y
+XP M.EMRT,1
+
+;;	Exclude PI time from user runtime?(Y,N)[
+;;	An answer of "yes" to this question will cause the monitor
+;;	to set up the KL10 accounting meters in such a manner that
+;;	users will not be charged for cpu time used during interrupts]: y
+XP M.XPI,1
+XP M.RTCA,0
+XP M.RTC,0
+
+;;	Account verification(Y,N)[LOGIN and the batch system will
+;;	verify that the user has specified a valid account]: y
+XP M.ACV,1
+XP M.MOS,0
+
+;;	# Data Channels on CPU0(2,0-?)[DF10s, DF10Cs, DX10s OR RH20'S  for disk and tape]: 2
+XP M0CHN,2
+
+;;	Channel 0 Type (DF10,DF10C,DX10,RH20): df10c
+XP M.CH0T,1
+XP M.0RH,0
+XP M00RH,0
+;;	On channel # 0:
+XP M.0TX,0
+XP M00TX,0
+
+;;	  # RC10s(0-2)[Controllers for RD10 Burroughs disks and
+;;	RM10B Bryant drums on channel 0]: 0
+XP M.0FH,0
+
+;;	  # RH10S for RS04'S(0-3)[Controllers for RS04 swapping
+;;	disks on channel 0]: 0
+XP M.0FS,0
+
+;;	  # RH10S for RP04'S,RP06'S(0-3)[Controllers for RP04,RP06
+;;	disk pack units on channel 0]: 1
+XP M.0RP,1
+XP M.P0F,0
+XP RP0CPU,0
+
+;;	  # Units on RPA(1-8): 8
+XP M.RPA,10
+XP M.P0T,0
+XP M.RS0P,0
+XP M.0RN,0
+
+;;	  # RP10s(0-3)[Controllers for Memorex and ISS RP02 and RP03 
+;;	disk pack units on channel 0]: 0
+XP M.0DP,0
+
+;;	  # TM10Bs(0-2)[Tape Controller for NRZI only drives
+;;	on channel  0]: 0
+XP M.0TB,0
+XP M.0D2,0
+
+;;	  # RH10's for TM02'S (0-2)[Mass-Bus tape controller for
+;;	TU16's and TU45's on channel 0]: 0
+XP M.0T2,0
+XP M.0T7,0
+
+;;	Channel 1 Type (DF10,DF10C,DX10,RH20): dx10
+XP M.CH1T,2
+XP M.1RH,0
+XP M01RH,0
+;;	On channel # 1:
+
+;;	  # Controllers(0-1)[TX01's or TX02's for TU70 Tape Drives on channel 1]: 1
+XP M.1FH,0
+XP M.1DP,0
+XP M.1RP,0
+XP M.1RN,0
+XP M.1FS,0
+XP M.1TB,0
+XP M.1TC,0
+XP M.1T2,0
+XP M.1D2,0
+XP M.1TX,1
+XP M.MT0T,3
+XP M.TX0P,0
+XP M.MT0C,1
+XP M.MT0P,0
+
+;;	  # Units on MTA(1-8): 2
+XP M.MT0,2
+
+;;	 # TM10As on CPU0(0,0-2)[I/O Bus type Controller for NRZI only drives]: 
+XP M0FHD,0
+XP M0FSD,0
+XP M0RPX,1
+XP M0DPC,0
+XP M0RNX,0
+XP M0MDF,0
+XP M0TAPN,1
+XP M.CHN,2
+XP M.RC10,0
+XP M.RH1S,0
+XP M.RH1P,1
+XP M.RH2P,0
+XP M.RH20,0
+XP M.RHP4,1
+XP M.RP20,0
+XP M.RP10,0
+XP M.TX01,1
+XP M.TM02,0
+XP M.DX20,0
+XP M.TM78,0
+XP M.TM10,0
+XP M.R11D,0
+XP M.TRH1,0
+;;	Specify which drives (M-N) are 7 track drives.
+;;	[Type one number (M) or one range(M-N) or ALL on separate lines.
+;;	Type extra carriage return when through.]
+DEFINE	MACKN0 (X)<
+
+;;	For controller MTA
+;;	
+>
+;;	Specify which tape drives (M-N) are capable of 6250 BPI densities.
+;;	[Type one number (M) or one range (M-N) or ALL on separate lines.
+;;	Type an extra carriage return when through.]
+DEFINE MACK60 (X)<
+
+;;	For controller MTA
+;;	
+>
+
+;;	# DTEs on CPU0(2,1-4)[Byte transfer device used for KL10 to PDP-11 front end communications]: 1
+XP M.0DTE,1
+
+;;	  # terminals on the master front end on CPU0(0,0-128)[include
+;;	only timesharing (DH11) lines, not CTY or KLINIK]: 0
+XP M0TTDN,1
+
+;;	  # line printers on the master front end on CPU0(0,0-2): 0
+XP M0LP0N,0
+XP M0LP1N,0
+XP M0LP2N,0
+XP M0LP3N,0
+
+;;	  # card readers on the master front end on CPU0(0,0-1): 0
+XP M0CR0N,0
+XP M0CR1N,0
+XP M0CR2N,0
+XP M0CR3N,0
+XP M.TTDN,1
+XP M.DLP,0
+XP M.DCR,0
+
+;;	# Jobs(1-511)[Maximum number attached and detached, not
+;;	counting null job]: 80
+XP M.JOB,120
+XP MD.2RR,1
+XP MD.SEG,0
+XP MD.DDT,1
+
+;;	Maximum P of core for each job(0,0-512)[0 means all of core]: 
+XP M.CORE,0
+
+;;	# K total system core(128-4096)[ONCE-only reports if
+;;	less core at startup]: 1024
+XP M.NKC,2000
+
+;;	Clock ticks per second(60,50)[Power line frequency]: 60
+XP M.TPS,74
+
+;;	# Real-time devices(0,0-77)[Max. # which can be put
+;;	on PI channels simultaneously]: 0
+XP M.RTD,0
+
+;;	Allow jobs to be locked in core(Y,N): y
+XP M.LOK,1
+
+;;	# Pages min guaranteed among jobs not locked in core(0,0-512)[
+;;	minimum free core pool for unlocked jobs, 0 assumes all of core]: 
+XP M.MGC,0
+
+;;	# High priority queues(0,0-15): 3
+XP M.HPQ,3
+
+;;	Meter(Y,N)[Performance analysis metering(METER UUO)]: y
+XP M.METR,1
+
+;;	SYSCHK(Y,N)[Initial hardware integrity check at ONCE-only time]: y
+XP M.SYSC,1
+
+;;	KASER(Y,N)[Include support for simulation of KA10
+;;	long floating point instructions]: y
+XP M.FPS,1
+
+;;	MSGSER(Y,N)[Support for device MPX. (more than one device
+;;	on an I/O channel). This feature is required for MCS-10].: y
+XP M.MSG,1
+
+;;	PSISER(Y,N)[Advanced programmed software interrupt service -
+;;	Support for the PISYS. UUO. This provides an easy
+;;	and powerful interrupt method for program to trap asynchronous
+;;	events. Required by MCS-10]: y
+XP M.PSI,1
+
+;;	IPCF(Y,N)[Inter process communication facility]: y
+XP M.IPCF,1
+
+;;	ENQ/DEQ(Y,N)[Sychronization primitives to allow
+;;	simultaneous file update by multiple co-operating processes]: y
+XP M.EQDQ,1
+
+;;	Monitor resident BOOTS(Y,N)[Core resident BOOTS
+;;	allowing fast dump/reload, and continuable STOPCD dump, etc.]: y
+XP M.MBTS,1
+
+;;	# CDRs(1,0-2)[Card reader on the I/O Bus]: 0
+XP M0CDR,0
+XP MD.C10,0
+XP MD0C10,0
+
+;;	CDP(Y,N)[Card punch]: 0
+;;	n
+XP M0CDP,0
+
+;;	DIS(Y,N)[Display device(VP10,340,30,VB10C) as distinguished from
+;;	display terminals]: n
+XP M.VP10,0
+XP M0VP10,0
+XP M.340,0
+XP M0340,0
+XP M.VBXC,0
+XP M0VBXC,0
+XP M.DIS,0
+XP M0DIS,0
+
+;;	# TD10s(1,0-2)[DECtape controls]: 0
+XP M0TD10,0
+
+;;	LPTs(1,0-3)[Line printers on the I/O Buss]: 1
+XP M0LPT,1
+XP MD.MOV,0
+
+;;	LPT0 Lower case(Y,N)[Does LPT0 have lower case capability]: y
+XP M.LP0L,1
+XP M0LP0L,1
+
+;;	PLTS(0,0-2)[Plotters]: 0
+XP M0PLT,0
+
+;;	PTP(Y,N)[Paper tape punch]: n
+XP M0PTP,0
+
+;;	PTR(Y,N)[Paper tape reader]: n
+XP M0PTR,0
+
+;;	# of DA28s(0,0-4)[Interprocessor channels for PDP8/11/15]: 0
+XP M.XTC,0
+XP M0XTC,0
+XP M0XTL,0
+
+;;	# DN60'S(0,0-11)[IBM BSC INTERFACES]: 0
+XP M0DN60,0
+XP M.DN60,0
+XP M00D60,0
+XP M01D60,0
+XP M02D60,0
+XP M03D60,0
+XP M04D60,0
+XP M05D60,0
+XP M06D60,0
+XP M07D60,0
+XP M08D60,0
+XP M09D60,0
+XP M0AD60,0
+XP M0BD60,0
+XP M0D60L,0
+XP M.0D60,0
+XP M.1D60,0
+XP M.2D60,0
+XP M.3D60,0
+XP M.4D60,0
+XP M.5D60,0
+XP M.6D60,0
+XP M.7D60,0
+XP M.8D60,0
+XP M.9D60,0
+XP M.AD60,0
+XP M.BD60,0
+XP M.D60L,0
+XP M.CDR,0
+XP M.CDP,0
+XP M.TD10,0
+XP M.LPT,1
+XP M.PLT,0
+XP M.PTP,0
+XP M.PTR,0
+
+;;	# PTYs(20,0-510)[Pseudo-terminals - each operator
+;;	service program and Batch stream needs one]: 20
+XP M.PTY,24
+
+;;	# IMPS (20,0-127)[IMP ports - number of (software)
+;;	connections available to the ARPA network]: 24
+XP IMPN,30
+XP M0IMP,30
+XP M1IMP,0
+
+;;	# ITY'S(10,0-63)[IMP ITY's - number of semi-pseudo
+;;	TTY's available for Telnet users from the ARPA network]: 16
+XP ITYN,20
+XP M0ITY,20
+XP M1ITY,0
+
+RADIX	10
+;;	Decimal "symbol,value"[
+;;	For any symbols to be defined.
+;;	Type one per line, extra carriage return when through]
+;;	
+RADIX	8
+;;	
+;;	Octal "symbol,value"[
+;;	For any symbol to be defined.
+;;	Type one per line, extra carriage return when through]
+;;	prvfil,055
+XP prvfil,055
+;;	mincor,35230
+XP mincor,35230
+;;	fil4wd,14
+XP fil4wd,14
+;;	
+;;	
+;;	SIXBIT "symbol,value"[
+;;	For any sixbit symbol to be defined.
+;;	Type one per line, extra carriage return when through]
+;;	
+
+DEFINE	SPCINT<
+;;	Type "device-mnemonic,PI-channel" for special devices[
+;;	With neither channel AC save routine nor device data block,
+;;	the "device-mnemonic" must be 3 characters or less.
+;;	Type extra carriage return when through.]
+;;	
+>
+
+DEFINE	SPCDDB<
+;;	Type "device-mnemonic,PI-channel,no.-of-devices"[
+;;	For special devices with device data blocks.
+;;	the "device-mnemonic" must be 3 characters or less.
+;;	Type extra carriage return when through.]
+;;	
+>
+
+DEFINE	SPCSAV<
+;;	Type "device-mnemonic,PI-channel,highest-ac-to-save"[
+;;	For special devices with channel save routines to save acs up to
+;;	the "highest-ac-to-save".  "Device" must be 3 char or less.
+;;	Type extra carriage return when through.]
+;;	
+>
+
+DEFINE	SPCEDN<
+;;	Type "ersatz-device,P,Pn,search-list-type"[
+;;	For customer defined ersatz devices.
+;;	The "esratz-device" must be exactly 3 characters long.
+;;	"P,Pn" is the Project/Programmer number associated.
+;;	"search-list-type" is one of ALL,SYS,JOB.
+;;	Type extra carriage return when through.]
+;;	
+>
+;;	
+;;	END OF HDWCNF.MAC
+

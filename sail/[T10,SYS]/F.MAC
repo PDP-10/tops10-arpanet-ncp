@@ -1,0 +1,485 @@
+UNIVERSAL	F - SOFTWARE FEATURE TEST FILE OUTPUT BY MONGEN DIALOG
+
+
+INTERN	M.F
+M.F==52
+XLIST
+
+;;	Feature set(KIFULL,KLFULL,KSFULL)[
+;;	KIFULL Includes all Tops-10 features supported for KI10 based systems
+;;	KLFULL	Same as KIFULL but for KL10 based systems
+;;	KSFULL  Same as KIFULL but for KS10 based systems]: KIFULL
+
+;;	Standard setting(YES,NO,LIST,EXPLAIN)[
+;;	Standard values for all feature test switches for your configuration]: NO;NONSTANDARD SETTINGS
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FTCIMP,1
+
+;;	%New switch FTCIMP(Y,N)[if Y, keep switch, else ignore it]: Y
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FTAIMP,0
+
+;;	%New switch FTAIMP(Y,N)[if Y, keep switch, else ignore it]: Y
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FTLINK,1
+
+;;	%New switch FTLINK(Y,N)[if Y, keep switch, else ignore it]: Y
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FTMAIL,1
+
+;;	%New switch FTMAIL(Y,N)[if Y, keep switch, else ignore it]: Y
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FtSecret,0		; leave secret code out for now
+
+;;	%New switch FTSECR(Y,N)[if Y, keep switch, else ignore it]: Y			; trust me
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FtMSM,0		; compile code to support MSM
+
+;;	%New switch FTMSM(Y,N)[if Y, keep switch, else ignore it]: Y			; yes, i want this
+;;	Type "switch,value"(or LIST or EXPLAIN)[
+;;	For any feature test switch to define,
+;;	type "switch,value", value=0 for off or -1 for on, or
+;;	type LIST or EXPLAIN to list or explain switches.
+;;	Type one per line, extra carriage return when through.]
+;;	
+;;	FTRDX,0
+;;	FTCMSR,1
+;;	FTDN60,0
+;;	FTXTC,0
+;;	FTDX10,0
+;;	FTTSK,0
+;;	FTTLAB,0
+;;	FTRSP,0
+;;	FTSCNR,0
+;;	FTCAFE,0
+;;	FTPSCD,1
+;;	FtOSave,-1		; allow OSAVEs for jovial and CMU
+;;	
+
+;;	Set each switch(Y,N)[List each switch with its current value and ask for new value]: N;DON'T SET EACH SWITCH INDIVIDUALLY
+
+LIST
+;COPYRIGHT (C) 1969,1970,1971,1972,1973,1974,1975,1976,1977,1978,1979 DIGITAL EQUIPMENT CORP., MAYNARD, MASS.
+
+
+;This universal file is assembled before each MONITOR module.  This file
+; must be assembled before any MONITOR modules are assembled, however,
+; it need be assembled only once regardless of the number of MONITOR
+; modules which follow.  Example:
+;
+;  .COMPILE F.MAC/COMPILE,S.MAC/COMPILE,FILIO,FILFND,FILUUO,SCNSER
+;
+;The files F.REL and S.REL are not needed and may be discarded.
+
+
+;List of independent MONITOR COMMAND features
+;These features can be eliminated from a system by
+;setting the appropriate FTXXXX symbol below to 0
+; and reassembling those routines in which code for the
+; feature appears.  The routines affected by each feature
+; are listed below.  To guarantee that no routines are
+; missed, FTXXXX is defined to be an INTERNAL in those routines
+; in which it is used in conditional assembly.  Thus LINK
+; will detect multiple defined GLOBALS if not
+; all routines affected have been reassembled.
+
+DEFINE	XPP(A,B)	;SYSTEM PARAMETER WHICH WILL PRINT-OUT FROM DDT
+<A=:B>
+
+DEFINE	XPL(A,B)	;LOCAL PARAMETER WHICH WILL PRINT-OUT FROM DDT
+<A=B>
+
+DEFINE	XP(A,B)		;SYSTEM PARAMETER WHICH WILL NOT PRINT FROM DDT
+<A==:B>
+XP FTTIME,-1;
+;;		;TIME ACCUMULATION[
+;;		;MONITOR COMPUTES TOTAL CPU RUN TIME USED BY EACH JOB]
+
+XP FTATTA,-1;
+;;		;ATTACH AND DETACH TTY TO JOB COMMANDS[
+;;		;AND CSTART AND CCONTINUE COMMANDS]
+
+XP FTRTTR,-1;
+;;		;REAL TIME TRAPPING UUO
+
+XP FTHPQ,-1;
+;;		;HIGH PRIORITY QUEUE FEATURE
+
+XP FTTRPS,-1;
+;;		;USER I/O - TRPSET,TRPJEN UUOS AND OPCODE 100 (PDP-10'S ONLY)
+
+XP FTLOCK,-1;
+;;		;LOCK UUO FEATURE[
+;;		;ALLOWS JOBS TO LOCK THEMSELVES IN CORE]
+
+XP FTTRAC,-1;
+;;		;MONITOR LEAVES USEFUL INFORMATION IN LOCATIONS IN COMMON.
+;;		; NOT NEEDED EXCEPT FOR LEAVING TRACKS TO AID IN DEBUGGING CRASHES.
+
+XP FTKCT,-1;
+;;		;ACCUMULATE THE PRODUCT OF <CORE>*<RUNNING TIME> FOR THOSE
+;;		; INSTALLATIONS WHICH USE THIS QUANTITY IN CHARGING EACH USER
+
+XP FTWATC,-1;
+;;		;WATCH COMMAND FOR SYSTEM RESPONSE DATA
+
+XP FTCNO,-1;
+;;		;CHARGE NUMBER TABLES
+
+XP FTTLIM,-1;
+;;		;IMPLEMENTS TIME LIMIT CODE AND OTHER BATCH FEATURES
+
+XP FTRSP,0;
+;;		;MEASURE USER TTY INPUT RESPONSE TIMES
+
+XP FTDAEM,-1;
+;;		;DAEMON CODE
+
+XP FTSPL,-1;
+;;		;SPOOLING CODE
+
+XP FTMP,-1;
+;;		;LINKAGE IN CASE MULTIPROCESSING OPTION WANTED
+;;		; AT MONGEN TIME.  WORKS LIKE FT2REL.  SLVSER IS LOADED
+;;		; IF ANSWER YES, ELSE COMMON DECLARES INTERNS.
+;;		; THIS FEATURE SWITCH AFFECTS MACROS CPLOCK, CPUNLK, SBLOK
+
+XP FTSFD,-1;
+;;		;ALLOW DISK SUB-FILE-DIRECTORIES
+
+XP FTVERS,-1;
+;;		;VERSION WATCH, ETC.
+
+XP FTEL,-1;
+;;		;DAEMON ERROR LOGGING
+
+XP FTJCON,-1;
+;;		;JOB CONTINUE CODE
+
+XP FTPOKE,-1;
+;;		;POKE UUO
+
+XP FTLPTR,-1;
+;;		;NEW LPT TROUBLE RECOVERY CODE
+
+XP FTCRTR,-1;
+;;		;NEW CDR TROUBLE RECOVERY CODE
+
+XP FTCPTR,-1;
+;;		;NEW CDP TROUBLE RECOVERY CODE
+
+XP FTMTSE,-1;
+;;		;CODE TO SET MTA DENSITY AND BUFFER SIZE
+
+XP FTCDRS,-1;
+;;		;CDR SUPER-IMAGE MODE CODE
+
+XP FT2SWP,-1;
+;;		;CODE TO ALLOW SWAPPING ON MORE THAN ONE UNIT
+
+XP FTSTR,-1;
+;;		;ALLOW MORE THAN ONE FILE STRUCTURE.[
+;;		;IF 0, MONITOR WILL ALLOW EXACTLY ONE FILE STRUCTURE.]
+
+XP FTDOPT,-1;
+;;		;DISK LATENCY OPTIMIZATION CODE
+
+XP FTDBAD,-1;
+;;		;CODE TO RECOVER WHEN DISKS GO OFF-LINE
+
+XP FTDHNG,-1;
+;;		;CODE TO RECOVER FROM HUNG DISKS
+
+XP FTDQTA,-1;
+;;		;DISK QUOTA CHECKING
+
+XP FTDSTT,-1;
+;;		;DISK I/O STATISTICS
+
+XP FTDSUP,-1;
+;;		;DISK SUPER USETI/USETO CODE
+
+XP FTDALC,-1;
+;;		;FANCY DISK ALLOCATION CODE
+
+XP FTDMRB,-1;
+;;		;MULTIPLE RIB CODE - ALLOW DISK FILES TO BE LONGER
+;;		; BY HAVING MORE THAN ONE RIB, I.E. EXTENDED RIBS.
+
+XP FTDSEK,-1;
+;;		;SEEK UUO
+
+XP FTDETS,-1;
+;;		;DISK ERROR SIMULATING CODE FOR TESTING ERROR RECOVERY
+
+XP FTDUFC,-1;
+;;		;DISK UFD COMPRESSOR TO KEEP FILES IN THE UFD
+;;		; IN THE ORDER THEY WERE CREATED
+
+XP FTDRDR,-1;
+;;		;DISK RENAME FILES ACROSS DIRECTORY CODE.
+;;		; IF OFF, AN ATTEMP TO CHANGE A FILE'S DIRECTORY WITH A RENAME WILL GIVE
+;;		; A PROTECTION ERROR.
+
+XP FTDBBK,-1;
+;;		;CODE TO MARK BAD DISK BLOCKS IN THE BAT BLOCKS
+;;		; AND TO MARK THE APPROPRIATE BITS IN SAT BLOCKS AS IN USE
+
+XP FTWHY,-1;
+;;		;ASK OPERATOR WHY RELOAD IN ONCE
+
+XP FTMETR,-1;
+;;		;METER UUO FOR PERMORMANCE ANALYSIS
+
+XP FTRTC,-1;
+;;		;REAL TIME CLOCK (DK10) SERVICE
+
+XP FTPI,-1;
+;;		;INCLUDE CALLS TO PSISER
+;;		; PROGRAMED SOFTWARE INTERRUPT SERVICE. THIS MODULE IS SELECTED
+;;		; AT MONGEN TIME SO THIS FEATURE TEST ONLY SAVES A FEW PUSHJ'S
+
+XP FTRDX,0;
+;;		;INCLUDE REMOTE DATA ENTRY SERVICE
+
+XP FTNET,-1;
+;;		;INCLUDE NCL NETWORK SOFTWARE
+
+XP FTCMSR,-1;
+;;		;INCLUDE COMMUNICATIONS MEASUREMENT CODE
+;;		;***  TURN OFF BEFORE 6.03 RELEASE  ***
+
+XP FTTSK,0;
+;;		;TASK TO TASK COMMUNICATION FEATURE
+
+XP FTMSGS,-1;
+;;		;INCLUDE CALLS TO MSGSER
+;;		; THIS IS ONLY A FEW PUSHJ'S IF MSGSER IS NOT LOADED.
+
+XP FTSWPE,-1;
+;;		;NEW SWAP READ ERROR RECOVERY CODE
+
+XP FTPEEK,-1;
+;;		;PEEK AND SPY UUOS
+
+XP FTGSRC,-1;
+;;		;GENERIC DEVICE SEARCH CODE
+
+XP FTPATT,-1;
+;;		;SPACE TO PATCH TABLES
+
+XP FTCCIN,-1;
+;;		;CONTROL C INTERCEPT CODE TO ALLOW
+;;		; PROGRAMS WITH APPROPRIATE PRIVILEGES TO
+;;		; TRAP CONTROL C INTERRUPTS VIA JOBINT BLOCK
+
+XP FTHDPX,-1;
+;;		;CODE IN SCNSER TO SUPPORT CERTAIN
+;;		; HALF DUPLEX TERMINALS LIKE CERTAIN TWX, ETC.
+
+XP FTGPO2,0;
+;;		;CODE IN SCNSER TO SUPPORT
+;;		; GPO 2B MODEMS FOR UK TELEPHONE LINE INTERFACES.
+
+XP FT630H,0;
+;;		;SINGLE-SCANNER 630 CODE
+
+XP FTMODM,-1;
+;;		;MODEM CONTROL CODE IN SCNSER
+
+XP FTSCNR,0;
+;;		;SET IF HAVE A DC10 OR DC68 OR BOTH, NOT IF NEITHER
+
+XP FTSCLC,-1;
+;;		;SCANNER SPECIAL LINE CONTROL[
+;;		;ALLOWS 680 SYSTEM TO SPECIFY SPECIAL HANDLING FOR SOME LINES,
+;;		;E.G. SUPPRESS FORCED CHARACTER OUTPUT FOR HUNG LINES.]
+
+XP FTTVP,-1;
+;;		;SCNSER CODE TO SUPPORT FANCY VERTICAL POSITIONING
+
+XP FTCAFE,0;
+;;		;SUPPORT THE DC76
+;;		; COMPREHENSIVE ASYNCHRONOUS FRONT END
+
+XP FT2741,-1;
+;;		;INCLUDE 2741 SUPPORT
+
+XP FTDIAL,-1;
+;;		;CODE TO DRIVE AUTOMATIC DIALLER
+;;		; MUST BE OFF IF FTMODM IS OFF
+
+XP FTAPLB,-1;
+;;		;APPEND TO LAST BLOCK OF A FILE[
+;;		;IF 0, MUST WRITE A NEW BLOCK TO APPEND TO A FILE WHOSE PROTECTION =4]
+
+XP FTAIR,-1;
+;;		;APPEND IMPLIES READ[
+;;		;IF -1 A FILE WHICH CAN BE APPENDED CAN BE READ
+;;		;IF 0 ONLY A PRIVILEGED JOB CAN READ AN APPEND-ONLY FILE]
+
+XP FTLIB,-1;
+;;		;CODE TO ALLOW LIB/SYS/XSYS REQUIRES FTSFD=-1[
+;;		;IF -1 USER CAN SET UP SO THAT LOOKUP WILL SEARCH HIS DISK, AN
+;;		;ARBITRARY PPN IF THE LOOKUP FAILS, THEN EXPERIMENTAL SYS AND SYS
+;;		;IF LOOKUP STILL FAILS]
+
+XP FTDPRI,-1;
+;;		;ENABLES DISK-PRIORITY CODE
+
+XP FTKI10,-1;
+;;		;INCLUDE KI10 SUPPORT
+
+XP FTKL10,0;
+;;		;INCLUDE KL10 SUPPORT
+
+XP FTKS10,0;
+;;		;INCLUDE KS10 SUPPORT
+
+XP FTTPAG,-1;
+;;		;TTY PAGE COMMAND
+
+XP FTTBLK,-1;
+;;		;TTY BLANK COMMAND
+
+XP FTNUL,-1;
+;;		;NULL DEVICE
+
+XP FTCBDB,0;
+;;		;CODE FOR DEBUGGING CB RESOURCE
+
+XP FT22BI,-1;
+;;		;22-BIT CHANNEL(DF10C)
+
+XP FTIPCF,-1;
+;;		;INTER-PROCESS COMMUNICATION FACILITY
+
+XP FTD10H,0;
+;;		;2741 LINES ON A DC-10 REASSEMBLE DLSINT
+
+XP FTXTC,0;
+;;		;XTCSER SUPPORT FOR THE DA28C INTERFACE
+
+XP FTNSCH,-1;
+;;		;CPU RESOURCE ALLOCATION CODE FOR NEW SCHEDULER
+
+XP FTGALA,-1;
+;;		;CODE FOR GALAXY-10 BATCH SYSTEM
+
+XP FTSLCK,0;
+;;		;CODE FOR SEARCH-LIST CHECKING IN FILSER.NORMALLY OFF
+
+XP FTMONL,-1;
+;;		;CODE TO ALLOW MEMORY TO BE SET ON-LINE DURING TIME-SHARING
+
+XP FTMOFF,-1;
+;;		;CODE TO ALLOW MEMORY TO BE SET OFF-LINE DURING TIME-SHARING
+
+XP FTEQDQ,-1;
+;;		;ENQ/DEQ FACILITY
+
+XP FTDN60,0	;
+;;		;INCLUDE DN60 SUPPORT (IBM BISYNC)
+
+XP FTDSIM,-1;
+;;		;INCLUDE CODE FOR SIMULTANEOUS UPDATE
+
+XP FTDHIA,-1;
+;;		;INCLUDE DISK HIGH AVAILABILITY CODE
+
+XP FTEXE,-1;
+;;		;INCLUDE SUPPORT FOR EXE FILES
+
+XP FTTLAB,0;
+;;		;INCLUDE TAPE LABELING FACILITY
+
+XP FTEMRT,0;
+;;		;INCLUDE KL10 EBOX/MBOX USER RUNTIME CAPABILITY
+
+XP FTDX10,0;
+;;		;DX10 DEVICE-CHAINING (MAGTAPES)
+
+XP FTMIC,-1;
+;;		;INCLUDE MACRO COMMAND PROCESSOR
+
+XP FTMLOG,-1;
+;;		;INCLUDE MIC LOG FILE SUPPORT
+
+XP FTFDAE,-1;
+;;		;INCLUDE SUPPORT FOR A FILE DAEMON
+
+XP FTPSTR,-1;
+;;		;INCLUDE SUPPORT FOR PRIVATE FILE STRUCTURES
+
+XP FTPSCD,-1;INCLUDE SCHEDULER PERFORMANCE GATHERING
+
+XP FTDUAL,-1;
+;;		;INCLUDE SUPPORT FOR DUAL-PORTED DISKS (RP04'S,RP06'S)
+
+XP FTMDA,-1;
+;;		;INCLUDE SUPPORT FOR MOUNTABLE DEVICE ALLOCATOR
+
+XP FTACCT,-1;
+;;		;INCLUDE SUPPORT FOR ACCOUNTING
+
+XP FTPJOB,-1;
+;;		;INCLUDE CODE FOR THE EXTENDED PJOB COMMAND
+
+XP FTMPB,0;
+;;		;INCLUDE CODE TO SUPPORT MPB
+
+XP FTMOS,0;
+;;		;INCLUDE CODE TO SUPPORT TGHA - MOS MEMORY
+
+XP FTMBTS,-1;
+;;		;INCLUDE SUPPORT FOR A MONITOR RESIDENT BOOTS
+;;		;THIS ENABLES CONTINUABLE STOPCD DUMP AND FAST DUMP/RELOAD
+
+XP FTEDSK,0;
+;;		;INCLUDE SUPPORT FOR EXPERIMENTAL DISK
+
+XP FTOSAV,-1;
+;;		;INCLUDE SUPPORT FOR SAV FILES
+;;	
+
+XP FTCIMP,-1
+XP FTAIMP,0
+XP FTLINK,-1
+XP FTMAIL,-1
+XP FTSECR,0
+XP FTMSM,0
+	IF2 <PURGE XP,XPL,XPP>
+
+	END
+;;	END OF F.MAC
+

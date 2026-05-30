@@ -1,0 +1,35 @@
+.RUN MONGEN
+*SHORT
+*F
+*F.MAC
+*KIFULL
+*NO;NONSTANDARD SETTINGS
+*FTCIMP,1
+*Y
+*FTAIMP,0
+*Y
+*FTLINK,1
+*Y
+*FTMAIL,1
+*Y
+*FtSecret,0		; leave secret code out for now
+*Y			; trust me
+*FtMSM,0		; compile code to support MSM
+*Y			; yes, i want this
+*FTRDX,0
+*FTCMSR,1
+*FTDN60,0
+*FTXTC,0
+*FTDX10,0
+*FTTSK,0
+*FTTLAB,0
+*FTRSP,0
+*FTSCNR,0
+*FTCAFE,0
+*FTPSCD,1
+*FtOSave,-1		; allow OSAVEs for jovial and CMU
+*
+*N;DON''T SET EACH SWITCH INDIVIDUALLY
+^C
+.COMPILE /COMP/NOBIN F.MAC,S.MAC,NETPRM.MAC
+.MIC Return
